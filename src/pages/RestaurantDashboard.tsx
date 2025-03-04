@@ -1,15 +1,25 @@
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, Calendar, List, PieChart, Settings, Users, Utensils, ClipboardList } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
 
 const RestaurantDashboard = () => {
+  const navigate = useNavigate();
+  
   useEffect(() => {
     document.title = "Dashboard | Foodz";
-  }, []);
+    
+    // Check if user is authenticated as restaurant
+    const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
+    const userType = localStorage.getItem("userType");
+    
+    if (!isAuthenticated || userType !== "restaurant") {
+      navigate("/auth");
+    }
+  }, [navigate]);
 
   // Mock data for dashboard
   const [orders, setOrders] = useState([
@@ -145,7 +155,7 @@ const RestaurantDashboard = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Button size="sm" variant="ghost" asChild>
-                          <Link to="/restaurant/orders">View</Link>
+                          <Link to={`/restaurant/orders?id=${order.id}`}>View</Link>
                         </Button>
                       </td>
                     </tr>
