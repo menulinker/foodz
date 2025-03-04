@@ -10,6 +10,7 @@ import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 import RestaurantDashboard from "./pages/RestaurantDashboard";
 import RestaurantMenu from "./pages/RestaurantMenu";
+import RestaurantOrders from "./pages/RestaurantOrders";
 import RestaurantSettings from "./pages/RestaurantSettings";
 import ClientProfile from "./pages/ClientProfile";
 
@@ -29,6 +30,7 @@ const App = () => (
           {/* Restaurant Routes */}
           <Route path="/restaurant/dashboard" element={<RestaurantDashboard />} />
           <Route path="/restaurant/menu" element={<RestaurantMenu />} />
+          <Route path="/restaurant/orders" element={<RestaurantOrders />} />
           <Route path="/restaurant/settings" element={<RestaurantSettings />} />
           
           {/* Client Routes */}

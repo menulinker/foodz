@@ -45,18 +45,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     
     const Comp = asChild ? Slot : "button";
     
-    return (
-      <Comp
-        className={cn(
-          baseStyles,
-          variantStyles[variant],
-          sizeStyles[size],
-          className
-        )}
-        ref={ref}
-        disabled={isLoading || props.disabled}
-        {...props}
-      >
+    // Fix for the React.Children.only error when using asChild with multiple children
+    const content = (
+      <>
         {isLoading && (
           <svg 
             className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" 
@@ -89,6 +80,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {!isLoading && icon && iconPosition === "right" && (
           <span className="ml-2">{icon}</span>
         )}
+      </>
+    );
+    
+    return (
+      <Comp
+        className={cn(
+          baseStyles,
+          variantStyles[variant],
+          sizeStyles[size],
+          className
+        )}
+        ref={ref}
+        disabled={isLoading || props.disabled}
+        {...props}
+      >
+        {content}
       </Comp>
     );
   }

@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Calendar, List, PieChart, Settings, Users, Utensils } from "lucide-react";
+import { BarChart3, Calendar, List, PieChart, Settings, Users, Utensils, ClipboardList } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
@@ -36,7 +36,13 @@ const RestaurantDashboard = () => {
               <h1 className="text-2xl md:text-3xl font-bold">Restaurant Dashboard</h1>
               <p className="text-muted-foreground mt-1">Manage your restaurant and orders</p>
             </div>
-            <div className="mt-4 md:mt-0">
+            <div className="mt-4 md:mt-0 flex gap-3">
+              <Button asChild>
+                <Link to="/restaurant/orders">
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                  Manage Orders
+                </Link>
+              </Button>
               <Button asChild>
                 <Link to="/restaurant/menu">
                   <Utensils className="mr-2 h-4 w-4" />
@@ -99,8 +105,11 @@ const RestaurantDashboard = () => {
           
           {/* Orders Table */}
           <div className="bg-white rounded-xl shadow-sm mb-8">
-            <div className="p-6 border-b">
+            <div className="p-6 border-b flex justify-between items-center">
               <h2 className="text-xl font-semibold">Recent Orders</h2>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/restaurant/orders">View All</Link>
+              </Button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -135,7 +144,9 @@ const RestaurantDashboard = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Button size="sm" variant="ghost">View</Button>
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link to="/restaurant/orders">View</Link>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -148,12 +159,14 @@ const RestaurantDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm">
               <div className="flex items-center mb-4">
-                <Calendar className="h-5 w-5 mr-2 text-foodz-600" />
-                <h3 className="font-semibold">Today's Schedule</h3>
+                <ClipboardList className="h-5 w-5 mr-2 text-foodz-600" />
+                <h3 className="font-semibold">Order Management</h3>
               </div>
-              <p className="text-muted-foreground text-sm">Manage your daily operations and staff schedule.</p>
-              <Button variant="outline" className="mt-4 w-full">
-                View Schedule
+              <p className="text-muted-foreground text-sm">Track and manage incoming customer orders.</p>
+              <Button variant="outline" className="mt-4 w-full" asChild>
+                <Link to="/restaurant/orders">
+                  View Orders
+                </Link>
               </Button>
             </div>
             
