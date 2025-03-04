@@ -1,6 +1,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { Slot } from "@radix-ui/react-slot";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "link";
@@ -8,6 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
   icon?: React.ReactNode;
   iconPosition?: "left" | "right";
+  asChild?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -18,7 +20,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     size = "md", 
     isLoading = false, 
     icon, 
-    iconPosition = "left", 
+    iconPosition = "left",
+    asChild = false,
     ...props 
   }, ref) => {
     // Base styles
@@ -40,8 +43,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       lg: "text-base h-12 px-7"
     };
     
+    const Comp = asChild ? Slot : "button";
+    
     return (
-      <button
+      <Comp
         className={cn(
           baseStyles,
           variantStyles[variant],
@@ -84,7 +89,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {!isLoading && icon && iconPosition === "right" && (
           <span className="ml-2">{icon}</span>
         )}
-      </button>
+      </Comp>
     );
   }
 );
