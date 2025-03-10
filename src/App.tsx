@@ -12,33 +12,36 @@ import RestaurantMenu from "./pages/RestaurantMenu";
 import RestaurantOrders from "./pages/RestaurantOrders";
 import RestaurantSettings from "./pages/RestaurantSettings";
 import ClientProfile from "./pages/ClientProfile";
+import { FirebaseAuthProvider } from "./context/FirebaseAuthContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          
-          {/* Restaurant Routes */}
-          <Route path="/restaurant/dashboard" element={<RestaurantDashboard />} />
-          <Route path="/restaurant/menu" element={<RestaurantMenu />} />
-          <Route path="/restaurant/orders" element={<RestaurantOrders />} />
-          <Route path="/restaurant/settings" element={<RestaurantSettings />} />
-          
-          {/* Client Routes */}
-          <Route path="/client/profile" element={<ClientProfile />} />
-          
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <FirebaseAuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* Restaurant Routes */}
+            <Route path="/restaurant/dashboard" element={<RestaurantDashboard />} />
+            <Route path="/restaurant/menu" element={<RestaurantMenu />} />
+            <Route path="/restaurant/orders" element={<RestaurantOrders />} />
+            <Route path="/restaurant/settings" element={<RestaurantSettings />} />
+            
+            {/* Client Routes */}
+            <Route path="/client/profile" element={<ClientProfile />} />
+            
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </FirebaseAuthProvider>
   </QueryClientProvider>
 );
 

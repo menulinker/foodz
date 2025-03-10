@@ -5,24 +5,8 @@ import { Button } from "@/components/ui-custom/Button";
 import { ArrowLeft, Eye, EyeOff, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useToast } from "@/hooks/use-toast";
-
-// Mock authentication - In a real app, this would connect to a backend service
-const useAuth = () => {
-  const login = (email: string, password: string, type: string) => {
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("userType", type);
-    return true;
-  };
-
-  const signup = (name: string, email: string, password: string, type: string) => {
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("userType", type);
-    return true;
-  };
-
-  return { login, signup };
-};
+import { useFirebaseAuth, UserRole } from "@/context/FirebaseAuthContext";
+import { toast } from "sonner";
 
 const Auth = () => {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
@@ -31,85 +15,62 @@ const Auth = () => {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [isLoginLoading, setIsLoginLoading] = useState(false);
   
   // Signup state
   const [signupData, setSignupData] = useState({
     name: "",
     email: "",
     password: "",
-    accountType: "restaurant" // Default to restaurant account
+    accountType: "restaurant" as UserRole // Default to restaurant account
   });
   const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [isSignupLoading, setIsSignupLoading] = useState(false);
   
-  const { login, signup } = useAuth();
+  const { login, register, isLoading } = useFirebaseAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoginLoading(true);
     
-    setTimeout(() => {
-      const success = login(loginEmail, loginPassword, "restaurant");
+    try {
+      await login(loginEmail, loginPassword, "restaurant" as UserRole);
       
-      if (success) {
-        toast({
-          title: "Login successful",
-          description: "Welcome back to Foodz!",
-        });
-        navigate("/restaurant/dashboard");
-      } else {
-        toast({
-          title: "Login failed",
-          description: "Invalid email or password. Please try again.",
-          variant: "destructive",
-        });
-      }
-      
-      setIsLoginLoading(false);
-    }, 1000);
+      // Navigate based on role
+      navigate("/restaurant/dashboard");
+    } catch (error: any) {
+      // Error is handled in the auth context with toast
+      console.error("Login error:", error);
+    }
   };
 
   const handleSignupChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setSignupData(prev => ({ ...prev, [name]: value }));
+    setSignupData(prev => ({ 
+      ...prev, 
+      [name]: name === "accountType" ? value as UserRole : value 
+    }));
   };
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSignupLoading(true);
     
-    setTimeout(() => {
-      const success = signup(
-        signupData.name,
+    try {
+      await register(
         signupData.email,
         signupData.password,
+        signupData.name,
         signupData.accountType
       );
       
-      if (success) {
-        toast({
-          title: "Account created successfully",
-          description: "Welcome to Foodz!",
-        });
-        
-        if (signupData.accountType === "restaurant") {
-          navigate("/restaurant/dashboard");
-        } else {
-          navigate("/client/profile");
-        }
+      // Navigate based on role
+      if (signupData.accountType === "restaurant") {
+        navigate("/restaurant/dashboard");
       } else {
-        toast({
-          title: "Signup failed",
-          description: "There was an error creating your account. Please try again.",
-          variant: "destructive",
-        });
+        navigate("/client/profile");
       }
-      
-      setIsSignupLoading(false);
-    }, 1000);
+    } catch (error: any) {
+      // Error is handled in the auth context with toast
+      console.error("Signup error:", error);
+    }
   };
 
   return (
@@ -217,7 +178,7 @@ const Auth = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  isLoading={isLoginLoading}
+                  isLoading={isLoading}
                 >
                   Log in
                 </Button>
@@ -332,7 +293,7 @@ const Auth = () => {
                     
                     <label 
                       className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
-                        signupData.accountType === "customer" 
+                        signupData.accountType === "client" 
                           ? "border-foodz-500 bg-foodz-50" 
                           : "border-border hover:border-foodz-200"
                       }`}
@@ -340,14 +301,14 @@ const Auth = () => {
                       <input
                         type="radio"
                         name="accountType"
-                        value="customer"
-                        checked={signupData.accountType === "customer"}
+                        value="client"
+                        checked={signupData.accountType === "client"}
                         onChange={handleSignupChange}
                         className="sr-only"
                       />
                       <div className="flex items-center justify-between w-full">
                         <span className="font-medium">Customer</span>
-                        {signupData.accountType === "customer" && (
+                        {signupData.accountType === "client" && (
                           <Check className="h-4 w-4 text-foodz-500" />
                         )}
                       </div>
@@ -384,7 +345,7 @@ const Auth = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  isLoading={isSignupLoading}
+                  isLoading={isLoading}
                 >
                   Create Account
                 </Button>
