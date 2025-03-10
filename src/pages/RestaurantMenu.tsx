@@ -27,7 +27,7 @@ const RestaurantMenu = () => {
   const { toast } = useToast();
   
   useEffect(() => {
-    document.title = "Menu Management | Foodz";
+    document.title = "Menu Management | Tapla";
     
     // Check if user is authenticated as restaurant
     const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";

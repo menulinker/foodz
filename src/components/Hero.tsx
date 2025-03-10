@@ -49,7 +49,8 @@ const Hero = () => {
                 className="group" 
                 asChild
               >
-                <Link to="/signup">
+                <Link to="/signup" className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium bg-base text-foodz-600 hover:bg-opacity-60 transition-all transform hover:-translate-y-1 shadow-lg"
+>
                   Get Started 
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
@@ -59,7 +60,8 @@ const Hero = () => {
                 size="lg" 
                 asChild
               >
-                <Link to="/demo">
+                <Link to="/demo" className="inline-flex items-center justify-center rounded-full px-6 py-3 text-black font-medium bg-white text-foodz-600 hover:bg-opacity-90 transition-all transform hover:-translate-y-1 shadow-lg"
+>
                   View Demo
                 </Link>
               </Button>

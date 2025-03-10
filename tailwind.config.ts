@@ -69,7 +69,7 @@ export default {
 					200: '#ffdecb',
 					300: '#ffbf99',
 					400: '#ff9a5f',
-					500: '#f97316', // Main orange
+					500: '#FF661F', // Main orange
 					600: '#ea580c',
 					700: '#c2410c',
 					800: '#9a3412',

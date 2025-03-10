@@ -21,7 +21,7 @@ interface Order {
 
 const RestaurantOrders = () => {
   useEffect(() => {
-    document.title = "Order Management | Foodz";
+    document.title = "Order Management | Tapla";
   }, []);
 
   // Mock data

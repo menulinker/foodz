@@ -10,7 +10,7 @@ const RestaurantDashboard = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    document.title = "Dashboard | Foodz";
+    document.title = "Dashboard | Tapla";
     
     // Check if user is authenticated as restaurant
     const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";

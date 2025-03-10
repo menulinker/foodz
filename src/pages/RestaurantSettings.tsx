@@ -8,7 +8,7 @@ import { Button } from "@/components/ui-custom/Button";
 
 const RestaurantSettings = () => {
   useEffect(() => {
-    document.title = "Restaurant Settings | Foodz";
+    document.title = "Restaurant Settings | Tapla";
   }, []);
 
   const [profile, setProfile] = useState({
