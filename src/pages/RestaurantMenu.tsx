@@ -6,91 +6,83 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
 import { useToast } from "@/hooks/use-toast";
+import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
+import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
+import { collection, where, query, doc, setDoc, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 interface MenuItem {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: number;
   category: string;
   available: boolean;
+  restaurantId: string;
   image?: string;
 }
 
 interface Category {
-  id: number;
+  id: string;
   name: string;
+  restaurantId: string;
 }
 
 const RestaurantMenu = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useFirebaseAuth();
   
+  // Redirect if not authenticated
   useEffect(() => {
-    document.title = "Menu Management | Tapla";
-    
-    // Check if user is authenticated as restaurant
-    const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
-    const userType = localStorage.getItem("userType");
-    
-    if (!isAuthenticated || userType !== "restaurant") {
+    if (!authLoading && !user) {
       navigate("/auth");
+      return;
     }
-  }, [navigate]);
+    
+    if (!authLoading && user && user.role !== "restaurant") {
+      navigate("/");
+      return;
+    }
+    
+    document.title = "Menu Management | Tapla";
+  }, [user, authLoading, navigate]);
+
+  // Fetch categories from Firestore
+  const { 
+    data: categoriesData, 
+    isLoading: categoriesLoading,
+    addDocument: addCategoryToFirestore,
+    deleteDocument: deleteCategoryFromFirestore,
+    refreshData: refreshCategories
+  } = useFirestoreCollection<Category>({
+    collectionName: "categories",
+    queries: user?.uid ? [where("restaurantId", "==", user.uid)] : []
+  });
+
+  // Fetch menu items from Firestore
+  const { 
+    data: menuItemsData,
+    isLoading: menuItemsLoading,
+    addDocument: addMenuItemToFirestore,
+    updateDocument: updateMenuItemInFirestore,
+    deleteDocument: deleteMenuItemFromFirestore,
+    refreshData: refreshMenuItems
+  } = useFirestoreCollection<MenuItem>({
+    collectionName: "menuItems",
+    queries: user?.uid ? [where("restaurantId", "==", user.uid)] : []
+  });
 
   // State management
-  const [categories, setCategories] = useState<Category[]>([
-    { id: 1, name: "Appetizers" },
-    { id: 2, name: "Main Dishes" },
-    { id: 3, name: "Desserts" },
-    { id: 4, name: "Beverages" }
-  ]);
-
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { 
-      id: 1, 
-      name: "Classic Burger", 
-      description: "Beef patty, lettuce, tomato, cheese, and special sauce", 
-      price: 12.99, 
-      category: "Main Dishes",
-      available: true,
-      image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&h=500&q=80"
-    },
-    { 
-      id: 2, 
-      name: "French Fries", 
-      description: "Crispy golden fries served with ketchup", 
-      price: 4.99, 
-      category: "Appetizers",
-      available: true,
-      image: "https://images.unsplash.com/photo-1576107232684-1279f390859f?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&h=500&q=80"
-    },
-    { 
-      id: 3, 
-      name: "Chocolate Cake", 
-      description: "Rich chocolate cake with a creamy frosting", 
-      price: 6.99, 
-      category: "Desserts",
-      available: true,
-      image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&h=500&q=80"
-    },
-    { 
-      id: 4, 
-      name: "Iced Coffee", 
-      description: "Cold brewed coffee served over ice", 
-      price: 3.99, 
-      category: "Beverages",
-      available: true,
-      image: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&h=500&q=80"
-    },
-  ]);
-
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [isAddMenuItemModalOpen, setIsAddMenuItemModalOpen] = useState(false);
   const [isEditMenuItemModalOpen, setIsEditMenuItemModalOpen] = useState(false);
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   
   // New menu item form state
   const [newMenuItem, setNewMenuItem] = useState<Omit<MenuItem, 'id'>>({
@@ -99,15 +91,39 @@ const RestaurantMenu = () => {
     price: 0,
     category: "",
     available: true,
+    restaurantId: user?.uid || "",
     image: ""
   });
+
+  // Update local state when Firestore data changes
+  useEffect(() => {
+    if (categoriesData) {
+      setCategories(categoriesData);
+    }
+  }, [categoriesData]);
+
+  useEffect(() => {
+    if (menuItemsData) {
+      setMenuItems(menuItemsData);
+    }
+  }, [menuItemsData]);
+
+  // Update newMenuItem restaurantId when user changes
+  useEffect(() => {
+    if (user?.uid) {
+      setNewMenuItem(prev => ({
+        ...prev,
+        restaurantId: user.uid
+      }));
+    }
+  }, [user?.uid]);
 
   const filteredItems = activeCategory === "All" 
     ? menuItems 
     : menuItems.filter(item => item.category === activeCategory);
     
   // Handle adding a new menu item
-  const handleAddMenuItem = () => {
+  const handleAddMenuItem = async () => {
     // Basic validation
     if (!newMenuItem.name || !newMenuItem.category || newMenuItem.price <= 0) {
       toast({
@@ -117,56 +133,51 @@ const RestaurantMenu = () => {
       });
       return;
     }
-    
-    const newId = Math.max(0, ...menuItems.map(item => item.id)) + 1;
-    
-    setMenuItems([
-      ...menuItems,
-      {
-        id: newId,
-        ...newMenuItem
-      }
-    ]);
-    
-    // Reset form and close modal
-    setNewMenuItem({
-      name: "",
-      description: "",
-      price: 0,
-      category: "",
-      available: true,
-      image: ""
-    });
-    
-    setIsAddMenuItemModalOpen(false);
-    
-    toast({
-      title: "Menu item added",
-      description: `${newMenuItem.name} has been added to your menu`,
-    });
+
+    try {
+      await addMenuItemToFirestore(newMenuItem);
+      await refreshMenuItems();
+      
+      // Reset form and close modal
+      setNewMenuItem({
+        name: "",
+        description: "",
+        price: 0,
+        category: "",
+        available: true,
+        restaurantId: user?.uid || "",
+        image: ""
+      });
+      
+      setIsAddMenuItemModalOpen(false);
+      
+      toast.success(`${newMenuItem.name} has been added to your menu`);
+    } catch (error) {
+      console.error("Error adding menu item:", error);
+      toast.error("Failed to add menu item. Please try again.");
+    }
   };
   
   // Handle editing a menu item
-  const handleEditMenuItem = () => {
+  const handleEditMenuItem = async () => {
     if (!editingItemId) return;
     
-    setMenuItems(menuItems.map(item => 
-      item.id === editingItemId 
-        ? { id: editingItemId, ...newMenuItem } 
-        : item
-    ));
-    
-    setIsEditMenuItemModalOpen(false);
-    setEditingItemId(null);
-    
-    toast({
-      title: "Menu item updated",
-      description: `${newMenuItem.name} has been updated in your menu`,
-    });
+    try {
+      await updateMenuItemInFirestore(editingItemId, newMenuItem);
+      await refreshMenuItems();
+      
+      setIsEditMenuItemModalOpen(false);
+      setEditingItemId(null);
+      
+      toast.success(`${newMenuItem.name} has been updated`);
+    } catch (error) {
+      console.error("Error updating menu item:", error);
+      toast.error("Failed to update menu item. Please try again.");
+    }
   };
   
   // Start editing an item
-  const startEditingItem = (itemId: number) => {
+  const startEditingItem = (itemId: string) => {
     const itemToEdit = menuItems.find(item => item.id === itemId);
     if (!itemToEdit) return;
     
@@ -176,6 +187,7 @@ const RestaurantMenu = () => {
       price: itemToEdit.price,
       category: itemToEdit.category,
       available: itemToEdit.available,
+      restaurantId: itemToEdit.restaurantId,
       image: itemToEdit.image || ""
     });
     
@@ -184,21 +196,24 @@ const RestaurantMenu = () => {
   };
   
   // Handle deleting a menu item
-  const handleDeleteMenuItem = (itemId: number) => {
+  const handleDeleteMenuItem = async (itemId: string) => {
     const itemToDelete = menuItems.find(item => item.id === itemId);
     
     if (window.confirm(`Are you sure you want to delete "${itemToDelete?.name}"?`)) {
-      setMenuItems(menuItems.filter(item => item.id !== itemId));
-      
-      toast({
-        title: "Menu item deleted",
-        description: `${itemToDelete?.name} has been removed from your menu`,
-      });
+      try {
+        await deleteMenuItemFromFirestore(itemId);
+        await refreshMenuItems();
+        
+        toast.success(`${itemToDelete?.name} has been removed from your menu`);
+      } catch (error) {
+        console.error("Error deleting menu item:", error);
+        toast.error("Failed to delete menu item. Please try again.");
+      }
     }
   };
   
   // Handle adding a new category
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
       toast({
         title: "Invalid category name",
@@ -208,24 +223,38 @@ const RestaurantMenu = () => {
       return;
     }
     
-    const newId = Math.max(0, ...categories.map(cat => cat.id)) + 1;
-    
-    setCategories([
-      ...categories,
-      {
-        id: newId,
-        name: newCategoryName.trim()
-      }
-    ]);
-    
-    setNewCategoryName("");
-    setIsAddCategoryModalOpen(false);
-    
-    toast({
-      title: "Category added",
-      description: `${newCategoryName} has been added to your categories`,
-    });
+    try {
+      await addCategoryToFirestore({
+        name: newCategoryName.trim(),
+        restaurantId: user?.uid || ""
+      });
+      await refreshCategories();
+      
+      setNewCategoryName("");
+      setIsAddCategoryModalOpen(false);
+      
+      toast.success(`${newCategoryName} has been added to your categories`);
+    } catch (error) {
+      console.error("Error adding category:", error);
+      toast.error("Failed to add category. Please try again.");
+    }
   };
+
+  // Loading state
+  if (authLoading || categoriesLoading || menuItemsLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-foodz-500 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading menu data...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

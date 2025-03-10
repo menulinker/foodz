@@ -6,97 +6,84 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
 import { toast } from "sonner";
+import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
+import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
+import { where, orderBy } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
+
+interface OrderItem {
+  name: string;
+  quantity: number;
+  price: number;
+}
 
 interface Order {
-  id: number;
-  customer: string;
-  items: { name: string; quantity: number; price: number }[];
+  id: string;
+  customer: {
+    id: string;
+    name: string;
+  };
+  items: OrderItem[];
   total: number;
   status: "pending" | "active" | "completed" | "cancelled";
-  time: string;
-  date: string;
+  timestamp: number;
+  restaurantId: string;
   tableNumber?: string;
   notes?: string;
 }
 
 const RestaurantOrders = () => {
-  useEffect(() => {
-    document.title = "Order Management | Tapla";
-  }, []);
-
-  // Mock data
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 1001,
-      customer: "John Doe",
-      items: [
-        { name: "Classic Burger", quantity: 1, price: 12.99 },
-        { name: "French Fries", quantity: 1, price: 4.99 }
-      ],
-      total: 17.98,
-      status: "active",
-      time: "12:30 PM",
-      date: "2023-03-04",
-      tableNumber: "T5",
-      notes: "No pickles on burger"
-    },
-    {
-      id: 1002,
-      customer: "Alice Smith",
-      items: [
-        { name: "Vegetarian Pizza", quantity: 1, price: 14.50 },
-        { name: "Cola", quantity: 2, price: 2.00 }
-      ],
-      total: 18.50,
-      status: "pending",
-      time: "12:45 PM",
-      date: "2023-03-04"
-    },
-    {
-      id: 1003,
-      customer: "Bob Johnson",
-      items: [
-        { name: "Caesar Salad", quantity: 1, price: 9.95 },
-        { name: "Water", quantity: 1, price: 0.00 }
-      ],
-      total: 9.95,
-      status: "completed",
-      time: "1:00 PM",
-      date: "2023-03-04",
-      tableNumber: "T3"
-    },
-    {
-      id: 1004,
-      customer: "Emma Davis",
-      items: [
-        { name: "Fish & Chips", quantity: 1, price: 16.50 }
-      ],
-      total: 16.50,
-      status: "cancelled",
-      time: "1:15 PM",
-      date: "2023-03-04",
-      notes: "Customer changed their mind"
-    },
-  ]);
-
+  const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useFirebaseAuth();
   const [activeFilter, setActiveFilter] = useState<"all" | "pending" | "active" | "completed" | "cancelled">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleStatusChange = (orderId: number, newStatus: Order["status"]) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
+  // Redirect if not authenticated as restaurant
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+      return;
+    }
     
-    // Show toast notification
-    toast.success(`Order #${orderId} status updated to ${newStatus}`, {
-      description: `The order has been moved to ${newStatus} status.`,
-      position: "top-right",
-    });
+    if (!authLoading && user && user.role !== "restaurant") {
+      navigate("/");
+      return;
+    }
+    
+    document.title = "Order Management | Tapla";
+  }, [user, authLoading, navigate]);
+
+  // Fetch orders from Firestore
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    updateDocument: updateOrderInFirestore,
+    refreshData: refreshOrders
+  } = useFirestoreCollection<Order>({
+    collectionName: "orders",
+    queries: user?.uid ? [
+      where("restaurantId", "==", user.uid),
+      orderBy("timestamp", "desc")
+    ] : []
+  });
+
+  const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
+    try {
+      await updateOrderInFirestore(orderId, { status: newStatus });
+      await refreshOrders();
+      
+      // Show toast notification
+      toast.success(`Order #${orderId} status updated to ${newStatus}`, {
+        description: `The order has been moved to ${newStatus} status.`,
+        position: "top-right",
+      });
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      toast.error("Failed to update order status. Please try again.");
+    }
   };
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = (ordersData || []).filter(order => {
     // Filter by status
     if (activeFilter !== "all" && order.status !== activeFilter) {
       return false;
@@ -107,7 +94,7 @@ const RestaurantOrders = () => {
       const query = searchQuery.toLowerCase();
       return (
         order.id.toString().includes(query) ||
-        order.customer.toLowerCase().includes(query) ||
+        order.customer.name.toLowerCase().includes(query) ||
         order.items.some(item => item.name.toLowerCase().includes(query))
       );
     }
@@ -146,6 +133,33 @@ const RestaurantOrders = () => {
         return null;
     }
   };
+
+  // Format timestamp to readable date and time
+  const formatDate = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  const formatTime = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Loading state
+  if (authLoading || ordersLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-foodz-500 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading orders...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -242,7 +256,7 @@ const RestaurantOrders = () => {
                   <div className="p-5 border-b border-gray-100">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-lg font-semibold">Order #{order.id}</span>
+                        <span className="text-lg font-semibold">Order #{order.id.slice(0, 6)}</span>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusBadgeStyle(order.status)}`}>
                           {getStatusIcon(order.status)}
                           {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
@@ -294,11 +308,11 @@ const RestaurantOrders = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                           <div>
                             <p className="text-sm text-gray-500">Customer</p>
-                            <p className="font-medium">{order.customer}</p>
+                            <p className="font-medium">{order.customer.name}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Date & Time</p>
-                            <p className="font-medium">{order.date} at {order.time}</p>
+                            <p className="font-medium">{formatDate(order.timestamp)} at {formatTime(order.timestamp)}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Total</p>

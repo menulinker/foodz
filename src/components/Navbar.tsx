@@ -4,39 +4,12 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui-custom/Button";
 import { Menu, X, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock authentication - In a real app, this would be connected to a proper auth system
-const useAuth = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem("isAuthenticated") === "true";
-  });
-  const [userType, setUserType] = useState(() => {
-    return localStorage.getItem("userType") || "";
-  });
-
-  const login = (email: string, password: string, type: string) => {
-    // In a real app, this would validate credentials with a backend
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("userType", type);
-    setIsAuthenticated(true);
-    setUserType(type);
-    return true;
-  };
-
-  const logout = () => {
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("userType");
-    setIsAuthenticated(false);
-    setUserType("");
-  };
-
-  return { isAuthenticated, userType, login, logout };
-};
+import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isAuthenticated, userType, logout } = useAuth();
+  const { user, logout } = useFirebaseAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -54,19 +27,24 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    toast({
-      title: "Logged out successfully",
-      description: "You have been logged out of your account",
-    });
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      toast({
+        title: "Logout error",
+        description: "There was a problem logging out. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getDashboardLink = () => {
-    if (userType === "restaurant") {
+    if (user?.role === "restaurant") {
       return "/restaurant/dashboard";
-    } else if (userType === "customer") {
+    } else if (user?.role === "client") {
       return "/client/profile";
     }
     return "/";
@@ -116,7 +94,7 @@ const Navbar = () => {
 
           {/* Auth Buttons Desktop */}
           <div className="hidden md:flex items-center space-x-4">
-            {isAuthenticated ? (
+            {user ? (
               <>
                 <Button 
                   variant="ghost" 
@@ -181,7 +159,7 @@ const Navbar = () => {
               Features
             </Link>
             <div className="pt-2 flex flex-col space-y-3">
-              {isAuthenticated ? (
+              {user ? (
                 <>
                   <Button 
                     variant="outline" 
