@@ -6,11 +6,16 @@ import { db } from '@/lib/firebase';
 interface UseFirestoreCollectionProps {
   collectionName: string;
   queries?: QueryConstraint[];
+  parentDoc?: {
+    collection: string;
+    id: string;
+  };
 }
 
 export const useFirestoreCollection = <T extends DocumentData>({ 
   collectionName, 
-  queries = [] 
+  queries = [],
+  parentDoc
 }: UseFirestoreCollectionProps) => {
   const [data, setData] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -19,7 +24,17 @@ export const useFirestoreCollection = <T extends DocumentData>({
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, collectionName), ...queries);
+      let collectionRef;
+      
+      if (parentDoc) {
+        // Use a subcollection if parentDoc is provided
+        collectionRef = collection(db, parentDoc.collection, parentDoc.id, collectionName);
+      } else {
+        // Use a root collection otherwise
+        collectionRef = collection(db, collectionName);
+      }
+      
+      const q = query(collectionRef, ...queries);
       const querySnapshot = await getDocs(q);
       
       const fetchedData: T[] = [];
@@ -40,7 +55,16 @@ export const useFirestoreCollection = <T extends DocumentData>({
 
   const getDocument = async (id: string) => {
     try {
-      const docRef = doc(db, collectionName, id);
+      let docRef;
+      
+      if (parentDoc) {
+        // Get document from subcollection
+        docRef = doc(db, parentDoc.collection, parentDoc.id, collectionName, id);
+      } else {
+        // Get document from root collection
+        docRef = doc(db, collectionName, id);
+      }
+      
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -57,7 +81,17 @@ export const useFirestoreCollection = <T extends DocumentData>({
 
   const addDocument = async (data: Omit<T, 'id'>) => {
     try {
-      const docRef = await addDoc(collection(db, collectionName), data);
+      let collectionRef;
+      
+      if (parentDoc) {
+        // Add to subcollection
+        collectionRef = collection(db, parentDoc.collection, parentDoc.id, collectionName);
+      } else {
+        // Add to root collection
+        collectionRef = collection(db, collectionName);
+      }
+      
+      const docRef = await addDoc(collectionRef, data);
       return docRef.id;
     } catch (err) {
       console.error('Error adding document:', err);
@@ -67,7 +101,16 @@ export const useFirestoreCollection = <T extends DocumentData>({
 
   const updateDocument = async (id: string, data: Partial<T>) => {
     try {
-      const docRef = doc(db, collectionName, id);
+      let docRef;
+      
+      if (parentDoc) {
+        // Update document in subcollection
+        docRef = doc(db, parentDoc.collection, parentDoc.id, collectionName, id);
+      } else {
+        // Update document in root collection
+        docRef = doc(db, collectionName, id);
+      }
+      
       await updateDoc(docRef, data as DocumentData);
     } catch (err) {
       console.error('Error updating document:', err);
@@ -77,7 +120,16 @@ export const useFirestoreCollection = <T extends DocumentData>({
 
   const deleteDocument = async (id: string) => {
     try {
-      const docRef = doc(db, collectionName, id);
+      let docRef;
+      
+      if (parentDoc) {
+        // Delete document from subcollection
+        docRef = doc(db, parentDoc.collection, parentDoc.id, collectionName, id);
+      } else {
+        // Delete document from root collection
+        docRef = doc(db, collectionName, id);
+      }
+      
       await deleteDoc(docRef);
     } catch (err) {
       console.error('Error deleting document:', err);
@@ -87,7 +139,7 @@ export const useFirestoreCollection = <T extends DocumentData>({
 
   useEffect(() => {
     fetchData();
-  }, [collectionName, JSON.stringify(queries)]);
+  }, [collectionName, JSON.stringify(queries), parentDoc?.id]);
 
   return {
     data,

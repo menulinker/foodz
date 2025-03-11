@@ -5,35 +5,110 @@ import { BarChart3, Calendar, List, PieChart, Settings, Users, Utensils, Clipboa
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
+import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
+import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
+import { where, orderBy } from "firebase/firestore";
+
+interface OrderItem {
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+interface Order {
+  id: string;
+  customer: {
+    id: string;
+    name: string;
+  };
+  items: OrderItem[];
+  total: number;
+  status: "pending" | "active" | "completed" | "cancelled";
+  timestamp: number;
+  restaurantId: string;
+  tableNumber?: string;
+  notes?: string;
+}
 
 const RestaurantDashboard = () => {
   const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useFirebaseAuth();
   
+  // Redirect if not authenticated as restaurant
   useEffect(() => {
-    document.title = "Dashboard | Tapla";
-    
-    // Check if user is authenticated as restaurant
-    const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
-    const userType = localStorage.getItem("userType");
-    
-    if (!isAuthenticated || userType !== "restaurant") {
+    if (!authLoading && !user) {
       navigate("/auth");
+      return;
     }
-  }, [navigate]);
+    
+    if (!authLoading && user && user.role !== "restaurant") {
+      navigate("/");
+      return;
+    }
+    
+    document.title = "Dashboard | Tapla";
+  }, [user, authLoading, navigate]);
 
-  // Mock data for dashboard
-  const [orders, setOrders] = useState([
-    { id: 1, customer: "John Doe", items: ["Burger", "Fries"], total: 15.99, status: "Completed", time: "12:30 PM" },
-    { id: 2, customer: "Alice Smith", items: ["Pizza", "Coke"], total: 18.50, status: "Preparing", time: "12:45 PM" },
-    { id: 3, customer: "Bob Johnson", items: ["Salad", "Water"], total: 9.95, status: "New", time: "1:00 PM" },
-  ]);
+  // Fetch orders from Firestore
+  const {
+    data: orders,
+    isLoading: ordersLoading
+  } = useFirestoreCollection<Order>({
+    collectionName: "orders",
+    parentDoc: user?.uid ? { collection: "restaurants", id: user.uid } : undefined,
+    queries: [orderBy("timestamp", "desc")]
+  });
 
+  // Calculate dashboard statistics
   const stats = {
-    totalOrders: 42,
-    revenue: 859.95,
-    customers: 28,
-    avgOrderValue: 20.47
+    totalOrders: orders?.length || 0,
+    revenue: orders?.reduce((sum, order) => sum + order.total, 0) || 0,
+    customers: orders ? new Set(orders.map(order => order.customer.id)).size : 0,
+    avgOrderValue: orders?.length ? (orders.reduce((sum, order) => sum + order.total, 0) / orders.length) : 0
   };
+
+  // Format timestamp to readable date and time
+  const formatDate = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  const formatTime = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Helper function to get status badge style
+  const getStatusStyle = (status: Order["status"]) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "active":
+        return "bg-blue-100 text-blue-800";
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  // Loading state
+  if (authLoading || ordersLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-foodz-500 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading dashboard data...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -135,31 +210,37 @@ const RestaurantDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">{order.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order.customer}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order.items.join(", ")}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">${order.total.toFixed(2)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order.time}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          order.status === "Completed" 
-                            ? "bg-green-100 text-green-800" 
-                            : order.status === "Preparing" 
-                            ? "bg-yellow-100 text-yellow-800" 
-                            : "bg-blue-100 text-blue-800"
-                        }`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link to={`/restaurant/orders?id=${order.id}`}>View</Link>
-                        </Button>
+                  {orders && orders.length > 0 ? (
+                    orders.slice(0, 5).map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">#{order.id.slice(0, 6)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{order.customer.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {order.items.map(item => item.name).join(", ")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">${order.total.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {formatTime(order.timestamp)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(order.status)}`}>
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link to={`/restaurant/orders`}>View</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-4 text-center text-muted-foreground">
+                        No orders found
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

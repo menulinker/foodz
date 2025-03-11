@@ -1,36 +1,135 @@
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, Clock, MapPin, Save, Upload } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
+import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
+
+interface BusinessHours {
+  day: string;
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+interface RestaurantProfile {
+  name: string;
+  description: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  cuisine: string;
+  logo: string;
+  businessHours: BusinessHours[];
+  settings: {
+    acceptOnlineOrders: boolean;
+    showInDirectory: boolean;
+    emailNotifications: boolean;
+  };
+}
+
+const defaultBusinessHours: BusinessHours[] = [
+  { day: "Monday", open: "09:00", close: "22:00", closed: false },
+  { day: "Tuesday", open: "09:00", close: "22:00", closed: false },
+  { day: "Wednesday", open: "09:00", close: "22:00", closed: false },
+  { day: "Thursday", open: "09:00", close: "22:00", closed: false },
+  { day: "Friday", open: "09:00", close: "23:00", closed: false },
+  { day: "Saturday", open: "10:00", close: "23:00", closed: false },
+  { day: "Sunday", open: "10:00", close: "21:00", closed: false },
+];
+
+const defaultProfile: RestaurantProfile = {
+  name: "",
+  description: "",
+  address: "",
+  phone: "",
+  email: "",
+  website: "",
+  cuisine: "",
+  logo: "",
+  businessHours: defaultBusinessHours,
+  settings: {
+    acceptOnlineOrders: true,
+    showInDirectory: true,
+    emailNotifications: true,
+  }
+};
 
 const RestaurantSettings = () => {
+  const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useFirebaseAuth();
+  const [profile, setProfile] = useState<RestaurantProfile>(defaultProfile);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Redirect if not authenticated as restaurant
   useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+      return;
+    }
+    
+    if (!authLoading && user && user.role !== "restaurant") {
+      navigate("/");
+      return;
+    }
+    
     document.title = "Restaurant Settings | Tapla";
-  }, []);
+  }, [user, authLoading, navigate]);
 
-  const [profile, setProfile] = useState({
-    name: "Delicious Bites",
-    description: "A family-friendly restaurant serving delicious meals made with fresh ingredients.",
-    address: "123 Main Street, Anytown, CA 12345",
-    phone: "(555) 123-4567",
-    email: "contact@deliciousbites.com",
-    website: "www.deliciousbites.com",
-    cuisine: "American, Italian",
-    logo: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&h=200&q=80"
-  });
-
-  const [businessHours, setBusinessHours] = useState([
-    { day: "Monday", open: "09:00", close: "22:00", closed: false },
-    { day: "Tuesday", open: "09:00", close: "22:00", closed: false },
-    { day: "Wednesday", open: "09:00", close: "22:00", closed: false },
-    { day: "Thursday", open: "09:00", close: "22:00", closed: false },
-    { day: "Friday", open: "09:00", close: "23:00", closed: false },
-    { day: "Saturday", open: "10:00", close: "23:00", closed: false },
-    { day: "Sunday", open: "10:00", close: "21:00", closed: false },
-  ]);
+  // Fetch restaurant profile from Firestore
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.uid) return;
+      
+      try {
+        const docRef = doc(db, "restaurants", user.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data() as Partial<RestaurantProfile>;
+          
+          // Merge with default values for any missing fields
+          setProfile({
+            ...defaultProfile,
+            ...data,
+            // Ensure all expected fields are present in businessHours
+            businessHours: data.businessHours || defaultBusinessHours,
+            settings: {
+              ...defaultProfile.settings,
+              ...(data.settings || {})
+            }
+          });
+        } else {
+          // If document doesn't exist, initialize with default values and user data
+          const initialProfile = {
+            ...defaultProfile,
+            name: user.displayName || "",
+            email: user.email || ""
+          };
+          setProfile(initialProfile);
+          
+          // Create the document in Firestore
+          await setDoc(docRef, initialProfile);
+        }
+      } catch (error) {
+        console.error("Error fetching restaurant profile:", error);
+        toast.error("Failed to load restaurant profile");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (user?.uid) {
+      fetchProfile();
+    }
+  }, [user]);
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -38,16 +137,52 @@ const RestaurantSettings = () => {
   };
 
   const handleHoursChange = (index: number, field: string, value: string | boolean) => {
-    const updatedHours = [...businessHours];
+    const updatedHours = [...profile.businessHours];
     updatedHours[index] = { ...updatedHours[index], [field]: value };
-    setBusinessHours(updatedHours);
+    setProfile(prev => ({ ...prev, businessHours: updatedHours }));
   };
 
-  const handleSave = () => {
-    console.log("Saving profile:", profile);
-    console.log("Saving business hours:", businessHours);
-    // Here you would normally save to a database
+  const handleSettingsChange = (setting: keyof RestaurantProfile["settings"], value: boolean) => {
+    setProfile(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        [setting]: value
+      }
+    }));
   };
+
+  const handleSave = async () => {
+    if (!user?.uid) return;
+    
+    setIsSaving(true);
+    try {
+      const docRef = doc(db, "restaurants", user.uid);
+      await setDoc(docRef, profile, { merge: true });
+      toast.success("Restaurant settings saved successfully");
+    } catch (error) {
+      console.error("Error saving restaurant profile:", error);
+      toast.error("Failed to save restaurant settings");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Loading state
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-foodz-500 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading restaurant settings...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -71,9 +206,9 @@ const RestaurantSettings = () => {
               <p className="text-muted-foreground mt-1">Manage your restaurant's profile and settings</p>
             </div>
             <div className="mt-4 md:mt-0">
-              <Button onClick={handleSave}>
+              <Button onClick={handleSave} disabled={isSaving}>
                 <Save className="mr-2 h-4 w-4" />
-                Save Changes
+                {isSaving ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </div>
@@ -186,7 +321,7 @@ const RestaurantSettings = () => {
                 
                 <div className="p-6">
                   <div className="space-y-4">
-                    {businessHours.map((hours, index) => (
+                    {profile.businessHours.map((hours, index) => (
                       <div key={hours.day} className="flex items-center flex-wrap space-y-2 md:space-y-0">
                         <div className="w-full md:w-1/4">
                           <span className="font-medium">{hours.day}</span>
@@ -257,6 +392,17 @@ const RestaurantSettings = () => {
                       <Upload className="h-4 w-4 mr-2" />
                       Upload Logo
                     </Button>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Logo upload functionality coming soon. For now, enter the URL of an existing image.
+                    </p>
+                    <input
+                      type="text"
+                      name="logo"
+                      value={profile.logo}
+                      onChange={handleProfileChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500 mt-4"
+                      placeholder="https://example.com/logo.jpg"
+                    />
                   </div>
                 </div>
               </div>
@@ -270,7 +416,12 @@ const RestaurantSettings = () => {
                 <div className="p-6 space-y-5">
                   <div>
                     <label className="flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" />
+                      <input 
+                        type="checkbox" 
+                        checked={profile.settings.acceptOnlineOrders}
+                        onChange={(e) => handleSettingsChange('acceptOnlineOrders', e.target.checked)}
+                        className="sr-only peer" 
+                      />
                       <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-foodz-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foodz-500"></div>
                       <span className="ml-3 text-sm font-medium">
                         Accept Online Orders
@@ -280,7 +431,12 @@ const RestaurantSettings = () => {
                   
                   <div>
                     <label className="flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" />
+                      <input 
+                        type="checkbox" 
+                        checked={profile.settings.showInDirectory}
+                        onChange={(e) => handleSettingsChange('showInDirectory', e.target.checked)}
+                        className="sr-only peer" 
+                      />
                       <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-foodz-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foodz-500"></div>
                       <span className="ml-3 text-sm font-medium">
                         Show Restaurant on Directory
@@ -290,7 +446,12 @@ const RestaurantSettings = () => {
                   
                   <div>
                     <label className="flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
+                      <input 
+                        type="checkbox" 
+                        checked={profile.settings.emailNotifications}
+                        onChange={(e) => handleSettingsChange('emailNotifications', e.target.checked)}
+                        className="sr-only peer" 
+                      />
                       <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-foodz-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foodz-500"></div>
                       <span className="ml-3 text-sm font-medium">
                         Email Notifications

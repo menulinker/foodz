@@ -6,8 +6,6 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
 import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
 import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
-import { where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
 interface MenuItem {
@@ -17,14 +15,12 @@ interface MenuItem {
   price: number;
   category: string;
   available: boolean;
-  restaurantId: string;
   image?: string;
 }
 
 interface Category {
   id: string;
   name: string;
-  restaurantId: string;
 }
 
 const RestaurantMenu = () => {
@@ -46,7 +42,7 @@ const RestaurantMenu = () => {
     document.title = "Menu Management | Tapla";
   }, [user, authLoading, navigate]);
 
-  // Fetch categories from Firestore
+  // Fetch categories from Firestore (using subcollection)
   const { 
     data: categoriesData, 
     isLoading: categoriesLoading,
@@ -55,10 +51,10 @@ const RestaurantMenu = () => {
     refreshData: refreshCategories
   } = useFirestoreCollection<Category>({
     collectionName: "categories",
-    queries: user?.uid ? [where("restaurantId", "==", user.uid)] : []
+    parentDoc: user?.uid ? { collection: "restaurants", id: user.uid } : undefined
   });
 
-  // Fetch menu items from Firestore
+  // Fetch menu items from Firestore (using subcollection)
   const { 
     data: menuItemsData,
     isLoading: menuItemsLoading,
@@ -68,7 +64,7 @@ const RestaurantMenu = () => {
     refreshData: refreshMenuItems
   } = useFirestoreCollection<MenuItem>({
     collectionName: "menuItems",
-    queries: user?.uid ? [where("restaurantId", "==", user.uid)] : []
+    parentDoc: user?.uid ? { collection: "restaurants", id: user.uid } : undefined
   });
 
   // State management
@@ -88,7 +84,6 @@ const RestaurantMenu = () => {
     price: 0,
     category: "",
     available: true,
-    restaurantId: user?.uid || "",
     image: ""
   });
 
@@ -104,16 +99,6 @@ const RestaurantMenu = () => {
       setMenuItems(menuItemsData);
     }
   }, [menuItemsData]);
-
-  // Update newMenuItem restaurantId when user changes
-  useEffect(() => {
-    if (user?.uid) {
-      setNewMenuItem(prev => ({
-        ...prev,
-        restaurantId: user.uid
-      }));
-    }
-  }, [user?.uid]);
 
   const filteredItems = activeCategory === "All" 
     ? menuItems 
@@ -140,7 +125,6 @@ const RestaurantMenu = () => {
         price: 0,
         category: "",
         available: true,
-        restaurantId: user?.uid || "",
         image: ""
       });
       
@@ -190,7 +174,6 @@ const RestaurantMenu = () => {
       price: itemToEdit.price,
       category: itemToEdit.category,
       available: itemToEdit.available,
-      restaurantId: itemToEdit.restaurantId,
       image: itemToEdit.image || ""
     });
     
@@ -230,8 +213,7 @@ const RestaurantMenu = () => {
     
     try {
       await addCategoryToFirestore({
-        name: newCategoryName.trim(),
-        restaurantId: user?.uid || ""
+        name: newCategoryName.trim()
       });
       await refreshCategories();
       
