@@ -40,11 +40,11 @@ export const useFirestoreCollection = <T extends DocumentData>({
       const fetchedData: T[] = [];
       querySnapshot.forEach((doc) => {
         const docData = doc.data() as Partial<T>;
-        // Safe approach to merge the document data with its ID
+        // Create a new object with the document data and ID
         fetchedData.push({ 
-          ...(docData as object), 
+          ...docData, 
           id: doc.id 
-        } as T);
+        } as unknown as T);
       });
       
       setData(fetchedData);
@@ -73,11 +73,11 @@ export const useFirestoreCollection = <T extends DocumentData>({
       
       if (docSnap.exists()) {
         const docData = docSnap.data() as Partial<T>;
-        // Safe approach to merge the document data with its ID
+        // Create a new object with the document data and ID
         return { 
-          ...(docData as object), 
+          ...docData, 
           id: docSnap.id 
-        } as T;
+        } as unknown as T;
       } else {
         throw new Error('Document not found');
       }
