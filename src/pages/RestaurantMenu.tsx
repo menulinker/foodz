@@ -1,14 +1,12 @@
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Edit, Plus, Trash2, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
-import { useToast } from "@/hooks/use-toast";
 import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
 import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
-import { collection, where, query, doc, setDoc, addDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
@@ -31,7 +29,6 @@ interface Category {
 
 const RestaurantMenu = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user, isLoading: authLoading } = useFirebaseAuth();
   
   // Redirect if not authenticated
@@ -126,10 +123,8 @@ const RestaurantMenu = () => {
   const handleAddMenuItem = async () => {
     // Basic validation
     if (!newMenuItem.name || !newMenuItem.category || newMenuItem.price <= 0) {
-      toast({
-        title: "Invalid form data",
+      toast("Invalid form data", {
         description: "Please fill in all required fields correctly.",
-        variant: "destructive",
       });
       return;
     }
@@ -151,10 +146,14 @@ const RestaurantMenu = () => {
       
       setIsAddMenuItemModalOpen(false);
       
-      toast.success(`${newMenuItem.name} has been added to your menu`);
+      toast(`${newMenuItem.name} has been added to your menu`, {
+        description: "Your menu item was successfully created."
+      });
     } catch (error) {
       console.error("Error adding menu item:", error);
-      toast.error("Failed to add menu item. Please try again.");
+      toast("Failed to add menu item", {
+        description: "Please try again.",
+      });
     }
   };
   
@@ -169,10 +168,14 @@ const RestaurantMenu = () => {
       setIsEditMenuItemModalOpen(false);
       setEditingItemId(null);
       
-      toast.success(`${newMenuItem.name} has been updated`);
+      toast(`${newMenuItem.name} has been updated`, {
+        description: "Your menu item was successfully updated."
+      });
     } catch (error) {
       console.error("Error updating menu item:", error);
-      toast.error("Failed to update menu item. Please try again.");
+      toast("Failed to update menu item", {
+        description: "Please try again.",
+      });
     }
   };
   
@@ -204,10 +207,14 @@ const RestaurantMenu = () => {
         await deleteMenuItemFromFirestore(itemId);
         await refreshMenuItems();
         
-        toast.success(`${itemToDelete?.name} has been removed from your menu`);
+        toast(`Menu item has been removed`, {
+          description: `${itemToDelete?.name} was successfully deleted.`
+        });
       } catch (error) {
         console.error("Error deleting menu item:", error);
-        toast.error("Failed to delete menu item. Please try again.");
+        toast("Failed to delete menu item", {
+          description: "Please try again.",
+        });
       }
     }
   };
@@ -215,10 +222,8 @@ const RestaurantMenu = () => {
   // Handle adding a new category
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      toast({
-        title: "Invalid category name",
+      toast("Invalid category name", {
         description: "Please enter a valid category name.",
-        variant: "destructive",
       });
       return;
     }
@@ -233,10 +238,14 @@ const RestaurantMenu = () => {
       setNewCategoryName("");
       setIsAddCategoryModalOpen(false);
       
-      toast.success(`${newCategoryName} has been added to your categories`);
+      toast(`${newCategoryName} has been added`, {
+        description: "Your category was successfully created."
+      });
     } catch (error) {
       console.error("Error adding category:", error);
-      toast.error("Failed to add category. Please try again.");
+      toast("Failed to add category", {
+        description: "Please try again.",
+      });
     }
   };
 
