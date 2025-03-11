@@ -12,6 +12,8 @@ import RestaurantMenu from "./pages/RestaurantMenu";
 import RestaurantOrders from "./pages/RestaurantOrders";
 import RestaurantSettings from "./pages/RestaurantSettings";
 import ClientProfile from "./pages/ClientProfile";
+import RestaurantList from "./pages/RestaurantList";
+import RestaurantDetail from "./pages/RestaurantDetail";
 import { FirebaseAuthProvider } from "./context/FirebaseAuthContext";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ const App = () => (
             
             {/* Client Routes */}
             <Route path="/client/profile" element={<ClientProfile />} />
+            <Route path="/restaurants" element={<RestaurantList />} />
+            <Route path="/restaurant/:id" element={<RestaurantDetail />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

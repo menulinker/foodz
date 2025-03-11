@@ -1,92 +1,128 @@
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Search, MapPin, Phone, Clock, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MapPin, Search, Utensils, Star, Filter, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
 import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 interface Restaurant {
   id: string;
   name: string;
   description: string;
-  address: string;
-  phone: string;
   cuisine: string;
-  logo: string;
-  settings: {
-    showInDirectory: boolean;
-    acceptOnlineOrders: boolean;
+  address: string;
+  rating?: number;
+  openingHours?: {
+    [day: string]: string;
   };
 }
 
 const RestaurantList = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useFirebaseAuth();
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [cuisineFilter, setCuisineFilter] = useState<string | null>(null);
+  const [cuisines, setCuisines] = useState<string[]>([]);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-      return;
-    }
-    
-    document.title = "Restaurants | Tapla";
-  }, [user, authLoading, navigate]);
-
-  // Fetch restaurants from Firestore
+  // Fetch restaurant data
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        const q = query(
-          collection(db, "restaurants"), 
-          where("settings.showInDirectory", "==", true)
-        );
-        
+        const restaurantsRef = collection(db, "restaurants");
+        const q = query(restaurantsRef);
         const querySnapshot = await getDocs(q);
-        const fetchedRestaurants: Restaurant[] = [];
+        
+        const restaurantData: Restaurant[] = [];
+        const uniqueCuisines = new Set<string>();
         
         querySnapshot.forEach((doc) => {
-          fetchedRestaurants.push({
-            id: doc.id,
-            ...doc.data() as Omit<Restaurant, 'id'>
-          });
+          const data = doc.data() as Restaurant;
+          
+          // Make sure we only include restaurants with names
+          if (data.name) {
+            const restaurant = {
+              id: doc.id,
+              name: data.name,
+              description: data.description || "",
+              cuisine: data.cuisine || "",
+              address: data.address || "",
+              rating: data.rating || 4.5,
+              openingHours: data.openingHours || {}
+            };
+            
+            restaurantData.push(restaurant);
+            
+            // Track unique cuisines for filtering
+            if (data.cuisine) {
+              uniqueCuisines.add(data.cuisine);
+            }
+          }
         });
         
-        setRestaurants(fetchedRestaurants);
+        setRestaurants(restaurantData);
+        setFilteredRestaurants(restaurantData);
+        setCuisines(Array.from(uniqueCuisines));
       } catch (error) {
         console.error("Error fetching restaurants:", error);
+        toast.error("Failed to load restaurants");
       } finally {
         setIsLoading(false);
       }
     };
     
-    if (user) {
-      fetchRestaurants();
-    }
-  }, [user]);
-
-  // Filter restaurants based on search query
-  const filteredRestaurants = restaurants.filter(restaurant => {
-    if (!searchQuery) return true;
+    fetchRestaurants();
+  }, []);
+  
+  // Filter restaurants when search or cuisine filter changes
+  useEffect(() => {
+    let results = restaurants;
     
-    const query = searchQuery.toLowerCase();
-    return (
-      restaurant.name.toLowerCase().includes(query) ||
-      restaurant.description.toLowerCase().includes(query) ||
-      restaurant.cuisine.toLowerCase().includes(query) ||
-      restaurant.address.toLowerCase().includes(query)
-    );
-  });
+    // Apply search filter
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      results = results.filter((restaurant) => 
+        restaurant.name.toLowerCase().includes(lowerQuery) || 
+        restaurant.description.toLowerCase().includes(lowerQuery) ||
+        restaurant.cuisine.toLowerCase().includes(lowerQuery) ||
+        restaurant.address.toLowerCase().includes(lowerQuery)
+      );
+    }
+    
+    // Apply cuisine filter
+    if (cuisineFilter) {
+      results = results.filter((restaurant) => 
+        restaurant.cuisine === cuisineFilter
+      );
+    }
+    
+    setFilteredRestaurants(results);
+  }, [searchQuery, cuisineFilter, restaurants]);
+  
+  // Handle cuisine filter toggle
+  const toggleCuisineFilter = (cuisine: string) => {
+    if (cuisineFilter === cuisine) {
+      setCuisineFilter(null);
+    } else {
+      setCuisineFilter(cuisine);
+    }
+  };
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery("");
+    setCuisineFilter(null);
+  };
 
   // Loading state
-  if (authLoading || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
@@ -107,104 +143,116 @@ const RestaurantList = () => {
       
       <main className="flex-grow bg-gray-50 pt-20">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Restaurants</h1>
-              <p className="text-muted-foreground mt-1">Find restaurants and place your order</p>
-            </div>
-            
-            <div className="mt-4 md:mt-0 md:w-1/3">
-              <div className="relative">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">Restaurants</h1>
+          <p className="text-muted-foreground mb-8">Find and order from restaurants near you</p>
+          
+          {/* Search and Filters */}
+          <div className="bg-white rounded-xl shadow-sm p-4 mb-8">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-grow relative">
                 <input
                   type="text"
-                  placeholder="Search restaurants, cuisine, location..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  placeholder="Search restaurants, cuisines..."
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              </div>
+              
+              <div className="md:w-auto">
+                <Button variant="outline" className="w-full">
+                  <Filter className="h-4 w-4 mr-2" />
+                  More Filters
+                </Button>
               </div>
             </div>
-          </div>
-          
-          {/* Restaurant List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRestaurants.length > 0 ? (
-              filteredRestaurants.map(restaurant => (
-                <div key={restaurant.id} className="bg-white rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
-                  {restaurant.logo ? (
-                    <div className="h-40 overflow-hidden">
-                      <img 
-                        src={restaurant.logo} 
-                        alt={restaurant.name} 
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-40 bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500">No Image</span>
-                    </div>
-                  )}
-                  
-                  <div className="p-5 flex-grow">
-                    <h3 className="text-xl font-semibold mb-2">{restaurant.name}</h3>
-                    
-                    <div className="text-sm text-gray-500 mb-3">
-                      <span className="inline-flex items-center">
-                        {restaurant.cuisine}
-                      </span>
-                    </div>
-                    
-                    <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
-                      {restaurant.description}
-                    </p>
-                    
-                    {restaurant.address && (
-                      <div className="flex items-start gap-2 mb-2 text-sm">
-                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                        <span className="text-gray-700">{restaurant.address}</span>
-                      </div>
-                    )}
-                    
-                    {restaurant.phone && (
-                      <div className="flex items-center gap-2 mb-2 text-sm">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-700">{restaurant.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="p-5 pt-0 mt-auto">
+            
+            {/* Cuisine filters */}
+            {cuisines.length > 0 && (
+              <div className="mt-4">
+                <div className="flex flex-wrap gap-2">
+                  {cuisines.map((cuisine) => (
                     <Button 
-                      className="w-full" 
-                      asChild
-                      disabled={!restaurant.settings?.acceptOnlineOrders}
+                      key={cuisine}
+                      variant={cuisineFilter === cuisine ? "primary" : "outline"}
+                      size="sm"
+                      onClick={() => toggleCuisineFilter(cuisine)}
                     >
-                      <Link to={`/restaurant/${restaurant.id}`}>
-                        View Menu
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Link>
+                      {cuisine}
                     </Button>
-                    
-                    {!restaurant.settings?.acceptOnlineOrders && (
-                      <p className="text-center text-xs text-red-500 mt-2">
-                        Online ordering not available
-                      </p>
-                    )}
-                  </div>
+                  ))}
+                  
+                  {(searchQuery || cuisineFilter) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={clearFilters}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear
+                    </Button>
+                  )}
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full bg-white p-10 rounded-xl shadow-sm text-center">
-                <p className="text-lg text-gray-500">No restaurants found</p>
-                {searchQuery && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Try adjusting your search query
-                  </p>
-                )}
               </div>
             )}
           </div>
+          
+          {/* Restaurant List */}
+          {filteredRestaurants.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredRestaurants.map((restaurant) => (
+                <div 
+                  key={restaurant.id} 
+                  className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/restaurant/${restaurant.id}`)}
+                >
+                  <div className="h-48 bg-gray-200 relative">
+                    {/* Restaurant image would go here */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Utensils className="h-12 w-12 text-gray-400" />
+                    </div>
+                  </div>
+                  
+                  <div className="p-5">
+                    <div className="flex justify-between mb-2">
+                      <h3 className="text-lg font-semibold">{restaurant.name}</h3>
+                      
+                      <div className="flex items-center bg-amber-50 px-2 py-1 rounded text-amber-600">
+                        <Star className="h-4 w-4 mr-1 fill-amber-500 text-amber-500" />
+                        <span className="text-sm font-medium">{restaurant.rating?.toFixed(1)}</span>
+                      </div>
+                    </div>
+                    
+                    {restaurant.cuisine && (
+                      <p className="text-foodz-600 text-sm mb-2">{restaurant.cuisine}</p>
+                    )}
+                    
+                    {restaurant.address && (
+                      <div className="flex items-start text-sm text-muted-foreground mb-3">
+                        <MapPin className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                        <span>{restaurant.address}</span>
+                      </div>
+                    )}
+                    
+                    <Button variant="outline" className="w-full mt-2">
+                      View Menu
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+              <p className="text-muted-foreground mb-4">No restaurants found matching your search criteria</p>
+              <Button 
+                variant="outline" 
+                onClick={clearFilters}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
         </div>
       </main>
       

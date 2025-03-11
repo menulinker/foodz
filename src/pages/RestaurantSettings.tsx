@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, Clock, MapPin, Save, Upload } from "lucide-react";
+import { ArrowLeft, Save, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
@@ -9,13 +9,6 @@ import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-
-interface BusinessHours {
-  day: string;
-  open: string;
-  close: string;
-  closed: boolean;
-}
 
 interface RestaurantProfile {
   name: string;
@@ -25,49 +18,43 @@ interface RestaurantProfile {
   email: string;
   website: string;
   cuisine: string;
-  logo: string;
-  businessHours: BusinessHours[];
-  settings: {
-    acceptOnlineOrders: boolean;
-    showInDirectory: boolean;
-    emailNotifications: boolean;
+  openingHours: {
+    monday: string;
+    tuesday: string;
+    wednesday: string;
+    thursday: string;
+    friday: string;
+    saturday: string;
+    sunday: string;
   };
 }
-
-const defaultBusinessHours: BusinessHours[] = [
-  { day: "Monday", open: "09:00", close: "22:00", closed: false },
-  { day: "Tuesday", open: "09:00", close: "22:00", closed: false },
-  { day: "Wednesday", open: "09:00", close: "22:00", closed: false },
-  { day: "Thursday", open: "09:00", close: "22:00", closed: false },
-  { day: "Friday", open: "09:00", close: "23:00", closed: false },
-  { day: "Saturday", open: "10:00", close: "23:00", closed: false },
-  { day: "Sunday", open: "10:00", close: "21:00", closed: false },
-];
-
-const defaultProfile: RestaurantProfile = {
-  name: "",
-  description: "",
-  address: "",
-  phone: "",
-  email: "",
-  website: "",
-  cuisine: "",
-  logo: "",
-  businessHours: defaultBusinessHours,
-  settings: {
-    acceptOnlineOrders: true,
-    showInDirectory: true,
-    emailNotifications: true,
-  }
-};
 
 const RestaurantSettings = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useFirebaseAuth();
-  const [profile, setProfile] = useState<RestaurantProfile>(defaultProfile);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
+  
+  // Restaurant profile state
+  const [restaurantProfile, setRestaurantProfile] = useState<RestaurantProfile>({
+    name: "",
+    description: "",
+    address: "",
+    phone: "",
+    email: "",
+    website: "",
+    cuisine: "",
+    openingHours: {
+      monday: "9:00 AM - 9:00 PM",
+      tuesday: "9:00 AM - 9:00 PM",
+      wednesday: "9:00 AM - 9:00 PM",
+      thursday: "9:00 AM - 9:00 PM",
+      friday: "9:00 AM - 9:00 PM",
+      saturday: "9:00 AM - 9:00 PM",
+      sunday: "Closed"
+    }
+  });
+  
   // Redirect if not authenticated as restaurant
   useEffect(() => {
     if (!authLoading && !user) {
@@ -82,41 +69,61 @@ const RestaurantSettings = () => {
     
     document.title = "Restaurant Settings | Tapla";
   }, [user, authLoading, navigate]);
-
-  // Fetch restaurant profile from Firestore
+  
+  // Load restaurant profile from Firestore
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchRestaurantProfile = async () => {
       if (!user?.uid) return;
       
       try {
-        const docRef = doc(db, "restaurants", user.uid);
-        const docSnap = await getDoc(docRef);
+        const restaurantRef = doc(db, "restaurants", user.uid);
+        const docSnapshot = await getDoc(restaurantRef);
         
-        if (docSnap.exists()) {
-          const data = docSnap.data() as Partial<RestaurantProfile>;
-          
-          // Merge with default values for any missing fields
-          setProfile({
-            ...defaultProfile,
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data() as RestaurantProfile;
+          setRestaurantProfile({
             ...data,
-            // Ensure all expected fields are present in businessHours
-            businessHours: data.businessHours || defaultBusinessHours,
-            settings: {
-              ...defaultProfile.settings,
-              ...(data.settings || {})
+            // Make sure name has a value
+            name: data.name || user.displayName || "",
+            // Make sure email has a value
+            email: data.email || user.email || "",
+            // Ensure opening hours object exists
+            openingHours: data.openingHours || {
+              monday: "9:00 AM - 9:00 PM",
+              tuesday: "9:00 AM - 9:00 PM",
+              wednesday: "9:00 AM - 9:00 PM",
+              thursday: "9:00 AM - 9:00 PM",
+              friday: "9:00 AM - 9:00 PM",
+              saturday: "9:00 AM - 9:00 PM",
+              sunday: "Closed"
             }
           });
         } else {
-          // If document doesn't exist, initialize with default values and user data
+          // Create initial restaurant profile if it doesn't exist
           const initialProfile = {
-            ...defaultProfile,
             name: user.displayName || "",
-            email: user.email || ""
+            description: "",
+            address: "",
+            phone: "",
+            email: user.email || "",
+            website: "",
+            cuisine: "",
+            openingHours: {
+              monday: "9:00 AM - 9:00 PM",
+              tuesday: "9:00 AM - 9:00 PM",
+              wednesday: "9:00 AM - 9:00 PM",
+              thursday: "9:00 AM - 9:00 PM",
+              friday: "9:00 AM - 9:00 PM",
+              saturday: "9:00 AM - 9:00 PM",
+              sunday: "Closed"
+            }
           };
-          setProfile(initialProfile);
           
-          // Create the document in Firestore
-          await setDoc(docRef, initialProfile);
+          // Set initial profile in state
+          setRestaurantProfile(initialProfile);
+          
+          // Save initial profile to Firestore
+          await setDoc(restaurantRef, initialProfile);
         }
       } catch (error) {
         console.error("Error fetching restaurant profile:", error);
@@ -126,48 +133,50 @@ const RestaurantSettings = () => {
       }
     };
     
-    if (user?.uid) {
-      fetchProfile();
+    if (user?.uid && !authLoading) {
+      fetchRestaurantProfile();
     }
-  }, [user]);
-
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  }, [user, authLoading]);
+  
+  // Handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setProfile(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleHoursChange = (index: number, field: string, value: string | boolean) => {
-    const updatedHours = [...profile.businessHours];
-    updatedHours[index] = { ...updatedHours[index], [field]: value };
-    setProfile(prev => ({ ...prev, businessHours: updatedHours }));
-  };
-
-  const handleSettingsChange = (setting: keyof RestaurantProfile["settings"], value: boolean) => {
-    setProfile(prev => ({
+    setRestaurantProfile((prev) => ({
       ...prev,
-      settings: {
-        ...prev.settings,
-        [setting]: value
+      [name]: value
+    }));
+  };
+  
+  // Handle opening hours change
+  const handleHoursChange = (day: keyof RestaurantProfile['openingHours'], value: string) => {
+    setRestaurantProfile((prev) => ({
+      ...prev,
+      openingHours: {
+        ...prev.openingHours,
+        [day]: value
       }
     }));
   };
-
-  const handleSave = async () => {
+  
+  // Save restaurant profile
+  const handleSaveProfile = async () => {
     if (!user?.uid) return;
     
     setIsSaving(true);
+    
     try {
-      const docRef = doc(db, "restaurants", user.uid);
-      await setDoc(docRef, profile, { merge: true });
-      toast.success("Restaurant settings saved successfully");
+      const restaurantRef = doc(db, "restaurants", user.uid);
+      await setDoc(restaurantRef, restaurantProfile, { merge: true });
+      
+      toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error saving restaurant profile:", error);
-      toast.error("Failed to save restaurant settings");
+      toast.error("Failed to save profile");
     } finally {
       setIsSaving(false);
     }
   };
-
+  
   // Loading state
   if (authLoading || isLoading) {
     return (
@@ -176,7 +185,7 @@ const RestaurantSettings = () => {
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-foodz-500 mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading restaurant settings...</p>
+            <p className="text-muted-foreground">Loading settings...</p>
           </div>
         </main>
         <Footer />
@@ -203,263 +212,168 @@ const RestaurantSettings = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">Restaurant Settings</h1>
-              <p className="text-muted-foreground mt-1">Manage your restaurant's profile and settings</p>
+              <p className="text-muted-foreground mt-1">Manage your restaurant profile and preferences</p>
             </div>
             <div className="mt-4 md:mt-0">
-              <Button onClick={handleSave} disabled={isSaving}>
-                <Save className="mr-2 h-4 w-4" />
-                {isSaving ? "Saving..." : "Save Changes"}
+              <Button 
+                onClick={handleSaveProfile}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white mr-2"></div>
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Changes
               </Button>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2">
-              {/* Restaurant Profile */}
-              <div className="bg-white rounded-xl shadow-sm mb-8">
-                <div className="p-6 border-b">
-                  <h2 className="text-xl font-semibold">Restaurant Profile</h2>
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-semibold">Restaurant Profile</h2>
+            </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium mb-2">
+                    Restaurant Name*
+                  </label>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    value={restaurantProfile.name}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                    required
+                  />
                 </div>
                 
-                <div className="p-6 space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Restaurant Name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={profile.name}
-                      onChange={handleProfileChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Description</label>
-                    <textarea
-                      name="description"
-                      value={profile.description}
-                      onChange={handleProfileChange}
-                      rows={4}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Phone Number</label>
-                      <input
-                        type="text"
-                        name="phone"
-                        value={profile.phone}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Email</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={profile.email}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Website</label>
-                      <input
-                        type="text"
-                        name="website"
-                        value={profile.website}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Cuisine Type</label>
-                      <input
-                        type="text"
-                        name="cuisine"
-                        value={profile.cuisine}
-                        onChange={handleProfileChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                        placeholder="e.g., Italian, Mexican, etc."
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      <MapPin className="h-4 w-4 inline mr-1" />
-                      Address
-                    </label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={profile.address}
-                      onChange={handleProfileChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Business Hours */}
-              <div className="bg-white rounded-xl shadow-sm">
-                <div className="p-6 border-b">
-                  <h2 className="text-xl font-semibold">
-                    <Calendar className="h-5 w-5 inline mr-2" />
-                    Business Hours
-                  </h2>
+                <div>
+                  <label htmlFor="cuisine" className="block text-sm font-medium mb-2">
+                    Cuisine Type
+                  </label>
+                  <input
+                    id="cuisine"
+                    name="cuisine"
+                    type="text"
+                    value={restaurantProfile.cuisine}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                    placeholder="e.g. Italian, Mexican, Chinese"
+                  />
                 </div>
                 
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {profile.businessHours.map((hours, index) => (
-                      <div key={hours.day} className="flex items-center flex-wrap space-y-2 md:space-y-0">
-                        <div className="w-full md:w-1/4">
-                          <span className="font-medium">{hours.day}</span>
-                        </div>
-                        
-                        <div className="w-full md:w-3/4 flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={hours.closed}
-                            onChange={(e) => handleHoursChange(index, 'closed', e.target.checked)}
-                            className="mr-2"
-                          />
-                          <label className="text-sm mr-4">Closed</label>
-                          
-                          {!hours.closed && (
-                            <div className="flex items-center space-x-2 flex-1">
-                              <Clock className="h-4 w-4 text-gray-500" />
-                              <input
-                                type="time"
-                                value={hours.open}
-                                onChange={(e) => handleHoursChange(index, 'open', e.target.value)}
-                                disabled={hours.closed}
-                                className="px-2 py-1 border border-gray-300 rounded"
-                              />
-                              <span>to</span>
-                              <input
-                                type="time"
-                                value={hours.close}
-                                onChange={(e) => handleHoursChange(index, 'close', e.target.value)}
-                                disabled={hours.closed}
-                                className="px-2 py-1 border border-gray-300 rounded"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="md:col-span-2">
+                  <label htmlFor="description" className="block text-sm font-medium mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={restaurantProfile.description}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                    rows={4}
+                    placeholder="Describe your restaurant..."
+                  />
                 </div>
               </div>
             </div>
             
-            {/* Sidebar */}
-            <div>
-              {/* Logo Upload */}
-              <div className="bg-white rounded-xl shadow-sm mb-8">
-                <div className="p-6 border-b">
-                  <h2 className="text-xl font-semibold">Logo</h2>
+            <div className="p-6 border-t">
+              <h2 className="text-xl font-semibold mb-6">Contact Information</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="address" className="block text-sm font-medium mb-2">
+                    Address
+                  </label>
+                  <input
+                    id="address"
+                    name="address"
+                    type="text"
+                    value={restaurantProfile.address}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  />
                 </div>
                 
-                <div className="p-6">
-                  <div className="flex flex-col items-center">
-                    {profile.logo ? (
-                      <div className="mb-4">
-                        <img 
-                          src={profile.logo} 
-                          alt="Restaurant Logo" 
-                          className="h-32 w-32 rounded-full object-cover border-4 border-foodz-100"
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-32 w-32 rounded-full bg-gray-200 flex items-center justify-center mb-4">
-                        <span className="text-gray-500 text-lg">No Logo</span>
-                      </div>
-                    )}
-                    
-                    <Button variant="outline">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Logo
-                    </Button>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Logo upload functionality coming soon. For now, enter the URL of an existing image.
-                    </p>
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={restaurantProfile.phone}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={restaurantProfile.email}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="website" className="block text-sm font-medium mb-2">
+                    Website (Optional)
+                  </label>
+                  <input
+                    id="website"
+                    name="website"
+                    type="url"
+                    value={restaurantProfile.website}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                    placeholder="https://example.com"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t">
+              <h2 className="text-xl font-semibold mb-6">Business Hours</h2>
+              
+              <div className="space-y-4">
+                {Object.entries(restaurantProfile.openingHours).map(([day, hours]) => (
+                  <div key={day} className="flex items-center">
+                    <span className="w-28 font-medium capitalize">{day}</span>
                     <input
                       type="text"
-                      name="logo"
-                      value={profile.logo}
-                      onChange={handleProfileChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500 mt-4"
-                      placeholder="https://example.com/logo.jpg"
+                      value={hours}
+                      onChange={(e) => handleHoursChange(day as keyof RestaurantProfile['openingHours'], e.target.value)}
+                      className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                      placeholder="e.g. 9:00 AM - 5:00 PM or Closed"
                     />
                   </div>
-                </div>
+                ))}
               </div>
-              
-              {/* Quick Settings */}
-              <div className="bg-white rounded-xl shadow-sm">
-                <div className="p-6 border-b">
-                  <h2 className="text-xl font-semibold">Quick Settings</h2>
-                </div>
-                
-                <div className="p-6 space-y-5">
-                  <div>
-                    <label className="flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={profile.settings.acceptOnlineOrders}
-                        onChange={(e) => handleSettingsChange('acceptOnlineOrders', e.target.checked)}
-                        className="sr-only peer" 
-                      />
-                      <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-foodz-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foodz-500"></div>
-                      <span className="ml-3 text-sm font-medium">
-                        Accept Online Orders
-                      </span>
-                    </label>
-                  </div>
-                  
-                  <div>
-                    <label className="flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={profile.settings.showInDirectory}
-                        onChange={(e) => handleSettingsChange('showInDirectory', e.target.checked)}
-                        className="sr-only peer" 
-                      />
-                      <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-foodz-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foodz-500"></div>
-                      <span className="ml-3 text-sm font-medium">
-                        Show Restaurant on Directory
-                      </span>
-                    </label>
-                  </div>
-                  
-                  <div>
-                    <label className="flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={profile.settings.emailNotifications}
-                        onChange={(e) => handleSettingsChange('emailNotifications', e.target.checked)}
-                        className="sr-only peer" 
-                      />
-                      <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-foodz-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foodz-500"></div>
-                      <span className="ml-3 text-sm font-medium">
-                        Email Notifications
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </div>
+            </div>
+            
+            <div className="p-6 border-t flex justify-end">
+              <Button onClick={handleSaveProfile} disabled={isSaving}>
+                {isSaving ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white mr-2"></div>
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Changes
+              </Button>
             </div>
           </div>
         </div>

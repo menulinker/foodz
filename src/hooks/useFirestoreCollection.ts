@@ -39,8 +39,12 @@ export const useFirestoreCollection = <T extends DocumentData>({
       
       const fetchedData: T[] = [];
       querySnapshot.forEach((doc) => {
-        // Type safety: first cast to unknown then to T to handle the type constraints
-        fetchedData.push({ id: doc.id, ...doc.data() } as unknown as T);
+        const docData = doc.data();
+        // Safe approach to merge the document data with its ID
+        fetchedData.push({ 
+          ...docData, 
+          id: doc.id 
+        } as T);
       });
       
       setData(fetchedData);
@@ -68,8 +72,12 @@ export const useFirestoreCollection = <T extends DocumentData>({
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        // Type safety: first cast to unknown then to T
-        return { id: docSnap.id, ...docSnap.data() } as unknown as T;
+        const docData = docSnap.data();
+        // Safe approach to merge the document data with its ID
+        return { 
+          ...docData, 
+          id: docSnap.id 
+        } as T;
       } else {
         throw new Error('Document not found');
       }
