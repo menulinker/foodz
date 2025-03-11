@@ -39,10 +39,10 @@ export const useFirestoreCollection = <T extends DocumentData>({
       
       const fetchedData: T[] = [];
       querySnapshot.forEach((doc) => {
-        const docData = doc.data();
+        const docData = doc.data() as Partial<T>;
         // Safe approach to merge the document data with its ID
         fetchedData.push({ 
-          ...docData, 
+          ...(docData as object), 
           id: doc.id 
         } as T);
       });
@@ -72,10 +72,10 @@ export const useFirestoreCollection = <T extends DocumentData>({
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        const docData = docSnap.data();
+        const docData = docSnap.data() as Partial<T>;
         // Safe approach to merge the document data with its ID
         return { 
-          ...docData, 
+          ...(docData as object), 
           id: docSnap.id 
         } as T;
       } else {
