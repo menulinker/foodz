@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { 
   createUserWithEmailAndPassword,
@@ -102,6 +103,7 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       
       if (role === "restaurant") {
+        // For restaurant accounts, create a restaurant document with required fields
         const restaurantData = {
           name: restaurantInfo?.name || name,
           ownerId: userCredential.user.uid,
