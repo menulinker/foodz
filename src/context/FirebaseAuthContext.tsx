@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { 
   createUserWithEmailAndPassword,
@@ -23,8 +22,8 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string, role: UserRole) => Promise<void>;
-  register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string, role: UserRole, restaurantInfo?: any) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -38,7 +37,6 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Get user data from Firestore
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           
           if (userDoc.exists()) {
@@ -50,21 +48,8 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
               role: userData.role as UserRole,
             });
           } else {
-            // If user document doesn't exist but user is authenticated
-            // Create a default user document (fallback)
-            const defaultRole = "client";
-            await setDoc(doc(db, "users", firebaseUser.uid), {
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              role: defaultRole
-            });
-            
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || "",
-              displayName: firebaseUser.displayName || "",
-              role: defaultRole,
-            });
+            await firebaseSignOut(auth);
+            throw new Error("User account is incomplete. Please contact support.");
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
@@ -79,27 +64,16 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string, role: UserRole) => {
+  const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // Check if user has the right role
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role !== role) {
-          await firebaseSignOut(auth);
-          throw new Error(`You're not registered as a ${role}. Please use the correct account type.`);
-        }
-      } else {
-        // If user exists in auth but not in Firestore, create the document
-        await setDoc(doc(db, "users", userCredential.user.uid), {
-          email: userCredential.user.email,
-          displayName: userCredential.user.displayName,
-          role: role
-        });
+      if (!userDoc.exists()) {
+        await firebaseSignOut(auth);
+        throw new Error("User account is incomplete. Please contact support.");
       }
       
       toast.success("Logged in successfully");
@@ -111,17 +85,15 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const register = async (email: string, password: string, name: string, role: UserRole) => {
+  const register = async (email: string, password: string, name: string, role: UserRole, restaurantInfo?: any) => {
     try {
       setIsLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Update profile with display name
       await updateProfile(userCredential.user, {
         displayName: name
       });
       
-      // Store user data in the users collection
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
@@ -129,18 +101,20 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         createdAt: new Date()
       });
       
-      // If role is restaurant, also create an entry in the restaurants collection
       if (role === "restaurant") {
-        await setDoc(doc(db, "restaurants", userCredential.user.uid), {
-          name: name, // Using displayName as the restaurant name initially
+        const restaurantData = {
+          name: restaurantInfo?.name || name,
           ownerId: userCredential.user.uid,
           email,
-          description: "",
-          cuisine: "",
-          address: "",
-          phone: "",
+          description: restaurantInfo?.description || "",
+          cuisine: restaurantInfo?.cuisine || "",
+          address: restaurantInfo?.address || "",
+          phone: restaurantInfo?.phone || "",
+          website: restaurantInfo?.website || "",
           createdAt: new Date()
-        });
+        };
+        
+        await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
       }
       
       toast.success("Account created successfully");

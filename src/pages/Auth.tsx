@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui-custom/Button";
-import { ArrowLeft, Eye, EyeOff, Check } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Check, ChevronDown, ChevronUp } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useFirebaseAuth, UserRole } from "@/context/FirebaseAuthContext";
@@ -13,7 +13,6 @@ const Auth = () => {
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [loginRole, setLoginRole] = useState<UserRole>("client");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   // Signup state
@@ -25,6 +24,17 @@ const Auth = () => {
   });
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   
+  // Restaurant info state (for restaurant signup)
+  const [showRestaurantInfo, setShowRestaurantInfo] = useState(false);
+  const [restaurantInfo, setRestaurantInfo] = useState({
+    name: "",
+    description: "",
+    cuisine: "",
+    address: "",
+    phone: "",
+    website: ""
+  });
+  
   const { login, register, isLoading } = useFirebaseAuth();
   const navigate = useNavigate();
 
@@ -32,14 +42,12 @@ const Auth = () => {
     e.preventDefault();
     
     try {
-      await login(loginEmail, loginPassword, loginRole);
+      await login(loginEmail, loginPassword);
       
-      // Navigate based on role
-      if (loginRole === "restaurant") {
-        navigate("/restaurant/dashboard");
-      } else {
-        navigate("/restaurants");
-      }
+      // Navigate to the appropriate page after successful login
+      // The navigation will happen automatically based on the user's role
+      // which is retrieved during auth state change in FirebaseAuthContext
+      navigate("/");
     } catch (error: any) {
       // Error is handled in the auth context with toast
       console.error("Login error:", error);
@@ -54,16 +62,36 @@ const Auth = () => {
     }));
   };
 
+  const handleRestaurantInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setRestaurantInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      await register(
-        signupData.email,
-        signupData.password,
-        signupData.name,
-        signupData.accountType
-      );
+      // If it's a restaurant account, pass restaurant info
+      if (signupData.accountType === "restaurant") {
+        await register(
+          signupData.email,
+          signupData.password,
+          signupData.name,
+          signupData.accountType,
+          restaurantInfo.name ? restaurantInfo : { name: signupData.name }
+        );
+      } else {
+        // For client account, no restaurant info is needed
+        await register(
+          signupData.email,
+          signupData.password,
+          signupData.name,
+          signupData.accountType
+        );
+      }
       
       // Navigate based on role
       if (signupData.accountType === "restaurant") {
@@ -176,60 +204,6 @@ const Auth = () => {
                     >
                       Forgot password?
                     </Link>
-                  </div>
-                </div>
-
-                {/* Account type selection for login */}
-                <div>
-                  <label className="block text-sm font-medium mb-3">
-                    Account type
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label 
-                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
-                        loginRole === "restaurant" 
-                          ? "border-foodz-500 bg-foodz-50" 
-                          : "border-border hover:border-foodz-200"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="loginRole"
-                        value="restaurant"
-                        checked={loginRole === "restaurant"}
-                        onChange={() => setLoginRole("restaurant")}
-                        className="sr-only"
-                      />
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-medium">Restaurant</span>
-                        {loginRole === "restaurant" && (
-                          <Check className="h-4 w-4 text-foodz-500" />
-                        )}
-                      </div>
-                    </label>
-                    
-                    <label 
-                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
-                        loginRole === "client" 
-                          ? "border-foodz-500 bg-foodz-50" 
-                          : "border-border hover:border-foodz-200"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="loginRole"
-                        value="client"
-                        checked={loginRole === "client"}
-                        onChange={() => setLoginRole("client")}
-                        className="sr-only"
-                      />
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-medium">Customer</span>
-                        {loginRole === "client" && (
-                          <Check className="h-4 w-4 text-foodz-500" />
-                        )}
-                      </div>
-                    </label>
                   </div>
                 </div>
                 
@@ -373,6 +347,121 @@ const Auth = () => {
                     </label>
                   </div>
                 </div>
+                
+                {/* Restaurant info form (appears when restaurant type is selected) */}
+                {signupData.accountType === "restaurant" && (
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <div className="flex justify-between items-center cursor-pointer" 
+                         onClick={() => setShowRestaurantInfo(!showRestaurantInfo)}>
+                      <h3 className="text-base font-medium">Restaurant Information</h3>
+                      {showRestaurantInfo ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    
+                    {showRestaurantInfo && (
+                      <div className="space-y-4 pt-2">
+                        <div>
+                          <label htmlFor="restaurant-name" className="block text-sm font-medium mb-1">
+                            Restaurant Name
+                          </label>
+                          <input
+                            id="restaurant-name"
+                            name="name"
+                            type="text"
+                            value={restaurantInfo.name}
+                            onChange={handleRestaurantInfoChange}
+                            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-foodz-500 text-sm"
+                            placeholder="Name of your restaurant"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="cuisine" className="block text-sm font-medium mb-1">
+                            Cuisine Type
+                          </label>
+                          <input
+                            id="cuisine"
+                            name="cuisine"
+                            type="text"
+                            value={restaurantInfo.cuisine}
+                            onChange={handleRestaurantInfoChange}
+                            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-foodz-500 text-sm"
+                            placeholder="e.g. Italian, Mexican, Indian"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="description" className="block text-sm font-medium mb-1">
+                            Description
+                          </label>
+                          <textarea
+                            id="description"
+                            name="description"
+                            value={restaurantInfo.description}
+                            onChange={handleRestaurantInfoChange}
+                            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-foodz-500 text-sm"
+                            placeholder="Brief description of your restaurant"
+                            rows={3}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="address" className="block text-sm font-medium mb-1">
+                            Address
+                          </label>
+                          <input
+                            id="address"
+                            name="address"
+                            type="text"
+                            value={restaurantInfo.address}
+                            onChange={handleRestaurantInfoChange}
+                            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-foodz-500 text-sm"
+                            placeholder="Your restaurant's address"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="phone" className="block text-sm font-medium mb-1">
+                            Phone
+                          </label>
+                          <input
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            value={restaurantInfo.phone}
+                            onChange={handleRestaurantInfoChange}
+                            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-foodz-500 text-sm"
+                            placeholder="Contact phone number"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="website" className="block text-sm font-medium mb-1">
+                            Website (Optional)
+                          </label>
+                          <input
+                            id="website"
+                            name="website"
+                            type="url"
+                            value={restaurantInfo.website}
+                            onChange={handleRestaurantInfoChange}
+                            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-foodz-500 text-sm"
+                            placeholder="https://yourrestaurant.com"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {!showRestaurantInfo && (
+                      <p className="text-xs text-muted-foreground">
+                        Click to add restaurant details (can be completed later in your profile)
+                      </p>
+                    )}
+                  </div>
+                )}
                 
                 <div className="flex items-start">
                   <input
