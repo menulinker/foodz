@@ -4,12 +4,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Star, MapPin, Phone, Globe, Clock, Plus, Minus, ShoppingBag, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Button } from "@/components/ui-custom/Button";
+import { Button } from "@/components/ui/button";
 import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Restaurant {
   id: string;
@@ -194,7 +195,7 @@ const RestaurantDetail = () => {
         })),
         total: calculateCartTotal(),
         status: "pending",
-        timestamp: Date.now(),
+        timestamp: serverTimestamp(),
         notes: customerNotes || undefined
       };
       
@@ -203,7 +204,7 @@ const RestaurantDetail = () => {
       const restaurantOrderDoc = await addDoc(restaurantOrdersRef, orderData);
       
       // Also add to client's orders collection
-      const clientOrdersRef = collection(db, "clients", user.uid, "clientOrders");
+      const clientOrdersRef = collection(db, "users", user.uid, "orders");
       await addDoc(clientOrdersRef, {
         ...orderData,
         orderId: restaurantOrderDoc.id,
@@ -218,7 +219,9 @@ const RestaurantDetail = () => {
       setCustomerNotes("");
       setIsCartOpen(false);
       
-      toast.success("Order placed successfully");
+      toast.success("Order placed successfully", {
+        description: "You can track your order in your profile"
+      });
     } catch (error) {
       console.error("Error submitting order:", error);
       toast.error("Failed to place order");
@@ -348,7 +351,7 @@ const RestaurantDetail = () => {
                     onClick={() => setIsCartOpen(true)}
                     disabled={cart.length === 0}
                   >
-                    <ShoppingBag className="h-5 w-5 mr-2" />
+                    <ShoppingBag className="mr-2" />
                     View Cart 
                     {cart.length > 0 && (
                       <span className="ml-2 bg-white text-foodz-600 px-2 py-0.5 rounded-full text-sm font-medium">
@@ -408,7 +411,7 @@ const RestaurantDetail = () => {
                   {filteredItems && filteredItems.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {filteredItems.map((item) => (
-                        <div key={item.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                        <Card key={item.id} className="overflow-hidden border-gray-100">
                           {item.image && (
                             <div className="h-40 overflow-hidden">
                               <img 
@@ -419,27 +422,31 @@ const RestaurantDetail = () => {
                             </div>
                           )}
                           
-                          <div className="p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold">{item.name}</h3>
+                          <CardHeader className="p-4 pb-0">
+                            <div className="flex justify-between items-start">
+                              <CardTitle className="text-lg">{item.name}</CardTitle>
                               <span className="font-medium text-foodz-600">${item.price.toFixed(2)}</span>
                             </div>
-                            
+                          </CardHeader>
+                          
+                          <CardContent className="p-4 pt-2">
                             {item.description && (
                               <p className="text-sm text-muted-foreground mb-4">{item.description}</p>
                             )}
-                            
+                          </CardContent>
+                          
+                          <CardFooter className="p-4 pt-0">
                             <Button 
-                              variant="outline" 
+                              variant="default" 
                               size="sm"
                               className="w-full"
                               onClick={() => addToCart(item)}
                             >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add to Order
+                              <Plus className="mr-1" />
+                              Add to Cart
                             </Button>
-                          </div>
-                        </div>
+                          </CardFooter>
+                        </Card>
                       ))}
                     </div>
                   ) : (
@@ -552,14 +559,10 @@ const RestaurantDetail = () => {
                 <Button 
                   className="w-full"
                   onClick={handleSubmitOrder}
-                  disabled={isSubmittingOrder}
+                  isLoading={isSubmittingOrder}
                 >
-                  {isSubmittingOrder ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-white mr-2"></div>
-                  ) : (
-                    <ShoppingBag className="h-5 w-5 mr-2" />
-                  )}
-                  Place Order
+                  <ShoppingBag className="mr-2" />
+                  Order Now
                 </Button>
               </div>
             )}
