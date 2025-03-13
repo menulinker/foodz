@@ -1,35 +1,16 @@
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Clock, PlayCircle, CheckCircle, XCircle, Search, Filter, ChevronDown, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Star, Clock, PlayCircle, CheckCircle, XCircle, Search, Plus, ChevronDown, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Button } from "@/components/ui-custom/Button";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
-import { useFirestoreCollection } from "@/hooks/useFirestoreCollection";
-import { orderBy } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
-
-interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
-}
-
-interface Order {
-  id: string;
-  customer: {
-    id: string;
-    name: string;
-  };
-  items: OrderItem[];
-  total: number;
-  status: "pending" | "active" | "completed" | "cancelled";
-  timestamp: number;
-  tableNumber?: string;
-  notes?: string;
-}
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { useRealTimeOrders, Order, OrderItem } from "@/hooks/useRealTimeOrders";
 
 const RestaurantOrders = () => {
   const navigate = useNavigate();
@@ -57,6 +38,16 @@ const RestaurantOrders = () => {
     newItemQuantity: "1"
   });
 
+  // Get real-time orders
+  const { 
+    orders, 
+    isLoading: ordersLoading, 
+    updateOrderStatus 
+  } = useRealTimeOrders({
+    restaurantId: user?.uid,
+    type: 'restaurant'
+  });
+
   // Redirect if not authenticated as restaurant
   useEffect(() => {
     if (!authLoading && !user) {
@@ -68,22 +59,7 @@ const RestaurantOrders = () => {
       navigate("/");
       return;
     }
-    
-    document.title = "Order Management | Tapla";
   }, [user, authLoading, navigate]);
-
-  // Fetch orders from Firestore
-  const {
-    data: ordersData,
-    isLoading: ordersLoading,
-    updateDocument: updateOrderInFirestore,
-    addDocument: addOrderToFirestore,
-    refreshData: refreshOrders
-  } = useFirestoreCollection<Order>({
-    collectionName: "orders",
-    parentDoc: user?.uid ? { collection: "restaurants", id: user.uid } : undefined,
-    queries: [orderBy("timestamp", "desc")]
-  });
 
   // Create a new order
   const handleAddOrderItem = () => {
@@ -158,8 +134,12 @@ const RestaurantOrders = () => {
         notes: newOrder.notes || undefined
       };
 
-      await addOrderToFirestore(orderData);
-      await refreshOrders();
+      if (!user || !user.uid) {
+        throw new Error("User not authenticated");
+      }
+
+      const orderRef = collection(db, "restaurants", user.uid, "orders");
+      await addDoc(orderRef, orderData);
 
       setNewOrder({
         customerName: "",
@@ -181,13 +161,11 @@ const RestaurantOrders = () => {
 
   const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
     try {
-      await updateOrderInFirestore(orderId, { status: newStatus });
-      await refreshOrders();
+      await updateOrderStatus(orderId, newStatus);
       
       // Show toast notification
-      toast.success(`Order #${orderId.slice(0, 6)} status updated to ${newStatus}`, {
+      toast.success(`Order status updated to ${newStatus}`, {
         description: `The order has been moved to ${newStatus} status.`,
-        position: "top-right",
       });
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -195,7 +173,7 @@ const RestaurantOrders = () => {
     }
   };
 
-  const filteredOrders = (ordersData || []).filter(order => {
+  const filteredOrders = (orders || []).filter(order => {
     // Filter by status
     if (activeFilter !== "all" && order.status !== activeFilter) {
       return false;
@@ -307,14 +285,14 @@ const RestaurantOrders = () => {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex flex-wrap gap-2">
                 <Button 
-                  variant={activeFilter === "all" ? "primary" : "outline"}
+                  variant={activeFilter === "all" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setActiveFilter("all")}
                 >
                   All Orders
                 </Button>
                 <Button 
-                  variant={activeFilter === "pending" ? "primary" : "outline"}
+                  variant={activeFilter === "pending" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setActiveFilter("pending")}
                 >
@@ -322,7 +300,7 @@ const RestaurantOrders = () => {
                   Pending
                 </Button>
                 <Button 
-                  variant={activeFilter === "active" ? "primary" : "outline"}
+                  variant={activeFilter === "active" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setActiveFilter("active")}
                 >
@@ -330,7 +308,7 @@ const RestaurantOrders = () => {
                   Active
                 </Button>
                 <Button 
-                  variant={activeFilter === "completed" ? "primary" : "outline"}
+                  variant={activeFilter === "completed" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setActiveFilter("completed")}
                 >
@@ -338,7 +316,7 @@ const RestaurantOrders = () => {
                   Completed
                 </Button>
                 <Button 
-                  variant={activeFilter === "cancelled" ? "primary" : "outline"}
+                  variant={activeFilter === "cancelled" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setActiveFilter("cancelled")}
                 >
@@ -362,113 +340,87 @@ const RestaurantOrders = () => {
             </div>
           </div>
           
-          {/* Orders List */}
-          <div className="space-y-4">
+          {/* Orders Table */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {filteredOrders.length === 0 ? (
-              <div className="bg-white p-10 rounded-xl shadow-sm text-center">
+              <div className="p-10 text-center">
                 <p className="text-lg text-gray-500">No orders match your filters</p>
               </div>
             ) : (
-              filteredOrders.map((order) => (
-                <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="p-5 border-b border-gray-100">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-semibold">Order #{order.id.slice(0, 6)}</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusBadgeStyle(order.status)}`}>
-                          {getStatusIcon(order.status)}
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {order.status === "pending" && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleStatusChange(order.id, "active")}
-                          >
-                            Start Preparation
-                          </Button>
-                        )}
-                        
-                        {order.status === "active" && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleStatusChange(order.id, "completed")}
-                          >
-                            Complete Order
-                          </Button>
-                        )}
-                        
-                        {(order.status === "pending" || order.status === "active") && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleStatusChange(order.id, "cancelled")}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                        
-                        <Button size="sm" variant="ghost">
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-5">
-                    <div className="flex flex-col md:flex-row gap-6">
-                      {/* Order details */}
-                      <div className="flex-grow">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                          <div>
-                            <p className="text-sm text-gray-500">Customer</p>
-                            <p className="font-medium">{order.customer.name}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Date & Time</p>
-                            <p className="font-medium">{formatDate(order.timestamp)} at {formatTime(order.timestamp)}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Total</p>
-                            <p className="font-medium">${order.total.toFixed(2)}</p>
-                          </div>
-                          {order.tableNumber && (
-                            <div>
-                              <p className="text-sm text-gray-500">Table</p>
-                              <p className="font-medium">{order.tableNumber}</p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order ID</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">#{order.id.slice(0, 6)}</TableCell>
+                        <TableCell>{order.customer.name}</TableCell>
+                        <TableCell>
+                          {formatDate(order.timestamp)}<br/>
+                          <span className="text-xs text-muted-foreground">{formatTime(order.timestamp)}</span>
+                        </TableCell>
+                        <TableCell>
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="text-sm">
+                              {item.quantity}x {item.name}
                             </div>
-                          )}
-                        </div>
-                        
-                        {order.notes && (
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-500">Customer Notes</p>
-                            <p className="text-sm bg-gray-50 p-2 rounded mt-1">{order.notes}</p>
+                          ))}
+                        </TableCell>
+                        <TableCell>${order.total.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusBadgeStyle(order.status)}`}>
+                            {getStatusIcon(order.status)}
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            {order.status === "pending" && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleStatusChange(order.id, "active")}
+                              >
+                                Start
+                              </Button>
+                            )}
+                            
+                            {order.status === "active" && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleStatusChange(order.id, "completed")}
+                              >
+                                Complete
+                              </Button>
+                            )}
+                            
+                            {(order.status === "pending" || order.status === "active") && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleStatusChange(order.id, "cancelled")}
+                              >
+                                Cancel
+                              </Button>
+                            )}
                           </div>
-                        )}
-                        
-                        <div>
-                          <p className="text-sm text-gray-500 mb-2">Order Items</p>
-                          <div className="space-y-2">
-                            {order.items.map((item, index) => (
-                              <div key={index} className="flex justify-between text-sm">
-                                <span>
-                                  {item.quantity}x {item.name}
-                                </span>
-                                <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         </div>
@@ -485,7 +437,7 @@ const RestaurantOrders = () => {
                 size="sm" 
                 onClick={() => setIsCreateOrderModalOpen(false)}
               >
-                <XCircle className="h-5 w-5" />
+                <X className="h-5 w-5" />
               </Button>
             </div>
             
@@ -496,7 +448,7 @@ const RestaurantOrders = () => {
                   type="text"
                   value={newOrder.customerName}
                   onChange={(e) => setNewOrder({...newOrder, customerName: e.target.value})}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
                   placeholder="Enter customer name"
                   required
                 />
@@ -508,7 +460,7 @@ const RestaurantOrders = () => {
                   type="text"
                   value={newOrder.tableNumber}
                   onChange={(e) => setNewOrder({...newOrder, tableNumber: e.target.value})}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
                   placeholder="e.g. Table 5"
                 />
               </div>
@@ -518,7 +470,7 @@ const RestaurantOrders = () => {
                 <textarea
                   value={newOrder.notes}
                   onChange={(e) => setNewOrder({...newOrder, notes: e.target.value})}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
                   placeholder="Any special instructions"
                   rows={2}
                 />
@@ -546,7 +498,7 @@ const RestaurantOrders = () => {
                             size="sm"
                             onClick={() => handleRemoveOrderItem(index)}
                           >
-                            <XCircle className="h-4 w-4 text-red-500" />
+                            <X className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
                       </div>
@@ -570,7 +522,7 @@ const RestaurantOrders = () => {
                         placeholder="Item name"
                         value={newOrder.newItemName}
                         onChange={(e) => setNewOrder({...newOrder, newItemName: e.target.value})}
-                        className="w-full px-3 py-2 border border-border rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                       />
                     </div>
                     <div className="col-span-3">
@@ -579,7 +531,7 @@ const RestaurantOrders = () => {
                         placeholder="Price"
                         value={newOrder.newItemPrice}
                         onChange={(e) => setNewOrder({...newOrder, newItemPrice: e.target.value})}
-                        className="w-full px-3 py-2 border border-border rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                         step="0.01"
                         min="0"
                       />
@@ -590,7 +542,7 @@ const RestaurantOrders = () => {
                         placeholder="Qty"
                         value={newOrder.newItemQuantity}
                         onChange={(e) => setNewOrder({...newOrder, newItemQuantity: e.target.value})}
-                        className="w-full px-3 py-2 border border-border rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                         min="1"
                       />
                     </div>
