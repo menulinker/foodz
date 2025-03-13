@@ -6,7 +6,6 @@ import { ArrowLeft, Eye, EyeOff, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useFirebaseAuth, UserRole } from "@/context/FirebaseAuthContext";
-import { toast } from "sonner";
 
 const Auth = () => {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
@@ -14,6 +13,7 @@ const Auth = () => {
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginRole, setLoginRole] = useState<UserRole>("client");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   // Signup state
@@ -21,7 +21,7 @@ const Auth = () => {
     name: "",
     email: "",
     password: "",
-    accountType: "restaurant" as UserRole // Default to restaurant account
+    accountType: "client" as UserRole
   });
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   
@@ -32,10 +32,14 @@ const Auth = () => {
     e.preventDefault();
     
     try {
-      await login(loginEmail, loginPassword, "restaurant" as UserRole);
+      await login(loginEmail, loginPassword, loginRole);
       
       // Navigate based on role
-      navigate("/restaurant/dashboard");
+      if (loginRole === "restaurant") {
+        navigate("/restaurant/dashboard");
+      } else {
+        navigate("/restaurants");
+      }
     } catch (error: any) {
       // Error is handled in the auth context with toast
       console.error("Login error:", error);
@@ -65,7 +69,7 @@ const Auth = () => {
       if (signupData.accountType === "restaurant") {
         navigate("/restaurant/dashboard");
       } else {
-        navigate("/client/profile");
+        navigate("/restaurants");
       }
     } catch (error: any) {
       // Error is handled in the auth context with toast
@@ -172,6 +176,60 @@ const Auth = () => {
                     >
                       Forgot password?
                     </Link>
+                  </div>
+                </div>
+
+                {/* Account type selection for login */}
+                <div>
+                  <label className="block text-sm font-medium mb-3">
+                    Account type
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label 
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
+                        loginRole === "restaurant" 
+                          ? "border-foodz-500 bg-foodz-50" 
+                          : "border-border hover:border-foodz-200"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="loginRole"
+                        value="restaurant"
+                        checked={loginRole === "restaurant"}
+                        onChange={() => setLoginRole("restaurant")}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-medium">Restaurant</span>
+                        {loginRole === "restaurant" && (
+                          <Check className="h-4 w-4 text-foodz-500" />
+                        )}
+                      </div>
+                    </label>
+                    
+                    <label 
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
+                        loginRole === "client" 
+                          ? "border-foodz-500 bg-foodz-50" 
+                          : "border-border hover:border-foodz-200"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="loginRole"
+                        value="client"
+                        checked={loginRole === "client"}
+                        onChange={() => setLoginRole("client")}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-medium">Customer</span>
+                        {loginRole === "client" && (
+                          <Check className="h-4 w-4 text-foodz-500" />
+                        )}
+                      </div>
+                    </label>
                   </div>
                 </div>
                 

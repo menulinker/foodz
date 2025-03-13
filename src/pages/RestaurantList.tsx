@@ -36,6 +36,7 @@ const RestaurantList = () => {
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
+        // Get restaurants directly from the restaurants collection
         const restaurantsRef = collection(db, "restaurants");
         const q = query(restaurantsRef);
         const querySnapshot = await getDocs(q);

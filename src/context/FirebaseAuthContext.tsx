@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 
@@ -121,13 +121,27 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         displayName: name
       });
       
-      // Store additional user data in Firestore
+      // Store user data in the users collection
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
         role,
         createdAt: new Date()
       });
+      
+      // If role is restaurant, also create an entry in the restaurants collection
+      if (role === "restaurant") {
+        await setDoc(doc(db, "restaurants", userCredential.user.uid), {
+          name: name, // Using displayName as the restaurant name initially
+          ownerId: userCredential.user.uid,
+          email,
+          description: "",
+          cuisine: "",
+          address: "",
+          phone: "",
+          createdAt: new Date()
+        });
+      }
       
       toast.success("Account created successfully");
     } catch (error: any) {
