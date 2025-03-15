@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile
 } from "firebase/auth";
-import { doc, setDoc, getDoc, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 
@@ -96,21 +96,26 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const register = async (email: string, password: string, name: string, role: UserRole, restaurantInfo?: any) => {
     try {
       setIsLoading(true);
+      
+      // First, create the user authentication account
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
+      // Update the display name
       await updateProfile(userCredential.user, {
         displayName: name
       });
       
+      // Create the common user document with role information
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
         role,
-        createdAt: new Date()
+        createdAt: serverTimestamp()
       });
       
+      // Handle role-specific document creation
       if (role === "restaurant") {
-        // For restaurant accounts, create a restaurant document with required fields
+        // For restaurant accounts, create a restaurant document
         const restaurantData = {
           name: restaurantInfo?.name || name,
           ownerId: userCredential.user.uid,
@@ -120,19 +125,22 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           address: restaurantInfo?.address || "",
           phone: restaurantInfo?.phone || "",
           website: restaurantInfo?.website || "",
-          createdAt: new Date()
+          createdAt: serverTimestamp()
         };
         
+        // Create the restaurant document
         await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
+        
       } else if (role === "client") {
-        // For client accounts, create a client document with basic information
+        // For client accounts, create a client document
         const clientData = {
           name,
           userId: userCredential.user.uid,
           email,
-          createdAt: new Date()
+          createdAt: serverTimestamp()
         };
         
+        // Create the client document
         await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
       }
       
@@ -141,6 +149,17 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         description: "Account created successfully"
       });
     } catch (error: any) {
+      // If there's an error during registration, clean up any partially created resources
+      try {
+        if (auth.currentUser) {
+          await firebaseSignOut(auth);
+          // Optionally, you could also delete the user account here:
+          // await deleteUser(auth.currentUser);
+        }
+      } catch (cleanupError) {
+        console.error("Error cleaning up after failed registration:", cleanupError);
+      }
+      
       toast({
         variant: "destructive",
         title: "Error",

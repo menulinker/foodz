@@ -14,6 +14,7 @@ interface QRCodeModalProps {
 
 const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeModalProps) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
+  // Support both /restaurant/:id and /restaurants/:id
   const shareUrl = `${window.location.origin}/restaurant/${restaurantId}`;
   
   useEffect(() => {
