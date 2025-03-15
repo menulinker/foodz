@@ -96,13 +96,15 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const register = async (email: string, password: string, name: string, role: UserRole, restaurantInfo?: any) => {
     try {
       setIsLoading(true);
+      // Step 1: Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
+      // Step 2: Update user profile with display name
       await updateProfile(userCredential.user, {
         displayName: name
       });
       
-      // Create the user document with a timestamp
+      // Step 3: Create the user document with a timestamp
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
@@ -110,6 +112,7 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         createdAt: serverTimestamp()
       });
       
+      // Step 4: Create role-specific document
       if (role === "restaurant") {
         // For restaurant accounts, create a restaurant document with required fields
         const restaurantData = {
@@ -136,13 +139,22 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           createdAt: serverTimestamp()
         };
         
+        // Add logging to track client document creation
+        console.log("Creating client document for:", userCredential.user.uid);
         try {
-          // Using setDoc instead of waiting for addDoc to complete
+          // Using setDoc to create document with specific ID
           await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
+          console.log("Client document created successfully");
         } catch (clientError) {
           console.error("Error creating client document:", clientError);
           // Continue registration process even if client document creation fails
-          // This prevents the user from getting stuck without an account
+          // But ensure user knows there might be an issue
+          toast({
+            variant: "default",
+            title: "Account created",
+            description: "Your account was created but some profile data couldn't be saved."
+          });
+          return; // Return early to prevent showing the success message below
         }
       }
       

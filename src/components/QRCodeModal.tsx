@@ -14,7 +14,8 @@ interface QRCodeModalProps {
 
 const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeModalProps) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
-  const shareUrl = `${window.location.origin}/restaurant/${restaurantId}`;
+  // Support both URL patterns - restaurant/:id and restaurants/:id (plural)
+  const shareUrl = `${window.location.origin}/restaurants/${restaurantId}`;
   
   useEffect(() => {
     if (isOpen && restaurantId) {
@@ -22,6 +23,8 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
       const encodedUrl = encodeURIComponent(shareUrl);
       const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodedUrl}&choe=UTF-8`;
       setQrCodeUrl(qrUrl);
+      console.log("Generated QR code URL:", qrUrl);
+      console.log("For restaurant page:", shareUrl);
     }
   }, [isOpen, shareUrl, restaurantId]);
   
