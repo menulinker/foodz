@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile
 } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 
@@ -96,23 +96,19 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const register = async (email: string, password: string, name: string, role: UserRole, restaurantInfo?: any) => {
     try {
       setIsLoading(true);
-      // Step 1: Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Step 2: Update user profile with display name
       await updateProfile(userCredential.user, {
         displayName: name
       });
       
-      // Step 3: Create the user document with a timestamp
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
         role,
-        createdAt: serverTimestamp()
+        createdAt: new Date()
       });
       
-      // Step 4: Create role-specific document
       if (role === "restaurant") {
         // For restaurant accounts, create a restaurant document with required fields
         const restaurantData = {
@@ -124,7 +120,7 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           address: restaurantInfo?.address || "",
           phone: restaurantInfo?.phone || "",
           website: restaurantInfo?.website || "",
-          createdAt: serverTimestamp()
+          createdAt: new Date()
         };
         
         await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
@@ -134,28 +130,10 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           name,
           userId: userCredential.user.uid,
           email,
-          phoneNumber: "",
-          address: "",
-          createdAt: serverTimestamp()
+          createdAt: new Date()
         };
         
-        // Add logging to track client document creation
-        console.log("Creating client document for:", userCredential.user.uid);
-        try {
-          // Using setDoc to create document with specific ID
-          await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
-          console.log("Client document created successfully");
-        } catch (clientError) {
-          console.error("Error creating client document:", clientError);
-          // Continue registration process even if client document creation fails
-          // But ensure user knows there might be an issue
-          toast({
-            variant: "default",
-            title: "Account created",
-            description: "Your account was created but some profile data couldn't be saved."
-          });
-          return; // Return early to prevent showing the success message below
-        }
+        await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
       }
       
       toast({
@@ -163,7 +141,6 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         description: "Account created successfully"
       });
     } catch (error: any) {
-      console.error("Registration error:", error);
       toast({
         variant: "destructive",
         title: "Error",

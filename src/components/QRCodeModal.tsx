@@ -14,19 +14,16 @@ interface QRCodeModalProps {
 
 const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeModalProps) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
-  // Support both URL patterns - restaurant/:id and restaurants/:id (plural)
-  const shareUrl = `${window.location.origin}/restaurants/${restaurantId}`;
+  const shareUrl = `${window.location.origin}/restaurant/${restaurantId}`;
   
   useEffect(() => {
-    if (isOpen && restaurantId) {
+    if (isOpen) {
       // Generate QR code using Google Charts API
       const encodedUrl = encodeURIComponent(shareUrl);
       const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodedUrl}&choe=UTF-8`;
       setQrCodeUrl(qrUrl);
-      console.log("Generated QR code URL:", qrUrl);
-      console.log("For restaurant page:", shareUrl);
     }
-  }, [isOpen, shareUrl, restaurantId]);
+  }, [isOpen, shareUrl]);
   
   const copyLinkToClipboard = () => {
     navigator.clipboard.writeText(shareUrl);
