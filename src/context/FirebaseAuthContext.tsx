@@ -9,7 +9,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, collection } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 export type UserRole = "client" | "restaurant";
 
@@ -77,9 +77,16 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         throw new Error("User account is incomplete. Please contact support.");
       }
       
-      toast.success("Logged in successfully");
+      toast({
+        title: "Success",
+        description: "Logged in successfully"
+      });
     } catch (error: any) {
-      toast.error(error.message || "Failed to log in");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to log in"
+      });
       throw error;
     } finally {
       setIsLoading(false);
@@ -117,11 +124,28 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         };
         
         await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
+      } else if (role === "client") {
+        // For client accounts, create a client document with basic information
+        const clientData = {
+          name,
+          userId: userCredential.user.uid,
+          email,
+          createdAt: new Date()
+        };
+        
+        await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
       }
       
-      toast.success("Account created successfully");
+      toast({
+        title: "Success",
+        description: "Account created successfully"
+      });
     } catch (error: any) {
-      toast.error(error.message || "Failed to create account");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create account"
+      });
       throw error;
     } finally {
       setIsLoading(false);
@@ -131,9 +155,16 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
-      toast.success("Logged out successfully");
+      toast({
+        title: "Success",
+        description: "Logged out successfully"
+      });
     } catch (error: any) {
-      toast.error(error.message || "Failed to log out");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to log out"
+      });
       throw error;
     }
   };
