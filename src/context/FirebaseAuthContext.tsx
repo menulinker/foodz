@@ -115,33 +115,48 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       // Handle role-specific document creation
       if (role === "restaurant") {
-        // For restaurant accounts, create a restaurant document
-        const restaurantData = {
-          name: restaurantInfo?.name || name,
-          ownerId: userCredential.user.uid,
-          email,
-          description: restaurantInfo?.description || "",
-          cuisine: restaurantInfo?.cuisine || "",
-          address: restaurantInfo?.address || "",
-          phone: restaurantInfo?.phone || "",
-          website: restaurantInfo?.website || "",
-          createdAt: serverTimestamp()
-        };
-        
-        // Create the restaurant document
-        await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
-        
+        try {
+          // For restaurant accounts, create a restaurant document
+          const restaurantData = {
+            name: restaurantInfo?.name || name,
+            ownerId: userCredential.user.uid,
+            email,
+            description: restaurantInfo?.description || "",
+            cuisine: restaurantInfo?.cuisine || "",
+            address: restaurantInfo?.address || "",
+            phone: restaurantInfo?.phone || "",
+            website: restaurantInfo?.website || "",
+            createdAt: serverTimestamp()
+          };
+          
+          // Create the restaurant document - verify collection name is "restaurants"
+          const restaurantRef = doc(db, "restaurants", userCredential.user.uid);
+          await setDoc(restaurantRef, restaurantData);
+          console.log("Restaurant document created successfully");
+        } catch (restaurantError: any) {
+          console.error("Error creating restaurant document:", restaurantError);
+          // Log specific restaurant error
+          throw new Error(`Restaurant profile creation failed: ${restaurantError.message}`);
+        }
       } else if (role === "client") {
-        // For client accounts, create a client document
-        const clientData = {
-          name,
-          userId: userCredential.user.uid,
-          email,
-          createdAt: serverTimestamp()
-        };
-        
-        // Create the client document
-        await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
+        try {
+          // For client accounts, create a client document
+          const clientData = {
+            name,
+            userId: userCredential.user.uid,
+            email,
+            createdAt: serverTimestamp()
+          };
+          
+          // Create the client document
+          const clientRef = doc(db, "clients", userCredential.user.uid);
+          await setDoc(clientRef, clientData);
+          console.log("Client document created successfully");
+        } catch (clientError: any) {
+          console.error("Error creating client document:", clientError);
+          // Log specific client error
+          throw new Error(`Client profile creation failed: ${clientError.message}`);
+        }
       }
       
       toast({
