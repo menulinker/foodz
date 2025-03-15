@@ -96,16 +96,13 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const register = async (email: string, password: string, name: string, role: UserRole, restaurantInfo?: any) => {
     try {
       setIsLoading(true);
-      
-      // First, create the user authentication account
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Update the display name
       await updateProfile(userCredential.user, {
         displayName: name
       });
       
-      // Create the common user document with role information
+      // Create the user document with a timestamp
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
@@ -113,49 +110,39 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         createdAt: serverTimestamp()
       });
       
-      // Handle role-specific document creation
       if (role === "restaurant") {
-        try {
-          // For restaurant accounts, create a restaurant document
-          const restaurantData = {
-            name: restaurantInfo?.name || name,
-            ownerId: userCredential.user.uid,
-            email,
-            description: restaurantInfo?.description || "",
-            cuisine: restaurantInfo?.cuisine || "",
-            address: restaurantInfo?.address || "",
-            phone: restaurantInfo?.phone || "",
-            website: restaurantInfo?.website || "",
-            createdAt: serverTimestamp()
-          };
-          
-          // Create the restaurant document - verify collection name is "restaurants"
-          const restaurantRef = doc(db, "restaurants", userCredential.user.uid);
-          await setDoc(restaurantRef, restaurantData);
-          console.log("Restaurant document created successfully");
-        } catch (restaurantError: any) {
-          console.error("Error creating restaurant document:", restaurantError);
-          // Log specific restaurant error
-          throw new Error(`Restaurant profile creation failed: ${restaurantError.message}`);
-        }
+        // For restaurant accounts, create a restaurant document with required fields
+        const restaurantData = {
+          name: restaurantInfo?.name || name,
+          ownerId: userCredential.user.uid,
+          email,
+          description: restaurantInfo?.description || "",
+          cuisine: restaurantInfo?.cuisine || "",
+          address: restaurantInfo?.address || "",
+          phone: restaurantInfo?.phone || "",
+          website: restaurantInfo?.website || "",
+          createdAt: serverTimestamp()
+        };
+        
+        await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
       } else if (role === "client") {
+        // For client accounts, create a client document with basic information
+        const clientData = {
+          name,
+          userId: userCredential.user.uid,
+          email,
+          phoneNumber: "",
+          address: "",
+          createdAt: serverTimestamp()
+        };
+        
         try {
-          // For client accounts, create a client document
-          const clientData = {
-            name,
-            userId: userCredential.user.uid,
-            email,
-            createdAt: serverTimestamp()
-          };
-          
-          // Create the client document
-          const clientRef = doc(db, "clients", userCredential.user.uid);
-          await setDoc(clientRef, clientData);
-          console.log("Client document created successfully");
-        } catch (clientError: any) {
+          // Using setDoc instead of waiting for addDoc to complete
+          await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
+        } catch (clientError) {
           console.error("Error creating client document:", clientError);
-          // Log specific client error
-          throw new Error(`Client profile creation failed: ${clientError.message}`);
+          // Continue registration process even if client document creation fails
+          // This prevents the user from getting stuck without an account
         }
       }
       
@@ -164,17 +151,7 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         description: "Account created successfully"
       });
     } catch (error: any) {
-      // If there's an error during registration, clean up any partially created resources
-      try {
-        if (auth.currentUser) {
-          await firebaseSignOut(auth);
-          // Optionally, you could also delete the user account here:
-          // await deleteUser(auth.currentUser);
-        }
-      } catch (cleanupError) {
-        console.error("Error cleaning up after failed registration:", cleanupError);
-      }
-      
+      console.error("Registration error:", error);
       toast({
         variant: "destructive",
         title: "Error",
