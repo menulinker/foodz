@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile
 } from "firebase/auth";
-import { doc, setDoc, getDoc, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "@/hooks/use-toast";
 
@@ -102,11 +102,12 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         displayName: name
       });
       
+      // Create the user document with a timestamp
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email,
         displayName: name,
         role,
-        createdAt: new Date()
+        createdAt: serverTimestamp()
       });
       
       if (role === "restaurant") {
@@ -120,7 +121,7 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           address: restaurantInfo?.address || "",
           phone: restaurantInfo?.phone || "",
           website: restaurantInfo?.website || "",
-          createdAt: new Date()
+          createdAt: serverTimestamp()
         };
         
         await setDoc(doc(db, "restaurants", userCredential.user.uid), restaurantData);
@@ -130,10 +131,19 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           name,
           userId: userCredential.user.uid,
           email,
-          createdAt: new Date()
+          phoneNumber: "",
+          address: "",
+          createdAt: serverTimestamp()
         };
         
-        await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
+        try {
+          // Using setDoc instead of waiting for addDoc to complete
+          await setDoc(doc(db, "clients", userCredential.user.uid), clientData);
+        } catch (clientError) {
+          console.error("Error creating client document:", clientError);
+          // Continue registration process even if client document creation fails
+          // This prevents the user from getting stuck without an account
+        }
       }
       
       toast({
@@ -141,6 +151,7 @@ export const FirebaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         description: "Account created successfully"
       });
     } catch (error: any) {
+      console.error("Registration error:", error);
       toast({
         variant: "destructive",
         title: "Error",
