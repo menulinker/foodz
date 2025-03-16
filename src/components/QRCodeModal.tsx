@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui-custom/Button";
-import { QrCode, Copy, Download, X } from "lucide-react";
+import { QrCode, Copy, Download, X, Share2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface QRCodeModalProps {
@@ -45,6 +45,31 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
       description: "QR code downloaded"
     });
   };
+
+  // Function to share QR code
+  const shareQRCode = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${restaurantName} Menu`,
+          text: `Check out the menu for ${restaurantName}`,
+          url: shareUrl,
+        });
+        toast({
+          title: "Success",
+          description: "Link shared successfully"
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to share",
+          variant: "destructive"
+        });
+      }
+    } else {
+      copyLinkToClipboard();
+    }
+  };
   
   if (!isOpen) return null;
   
@@ -69,17 +94,25 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
             Share this QR code with your customers so they can easily access your restaurant page
           </p>
           
-          <div className="border p-3 rounded-lg bg-gray-50 mb-4">
+          <div className="border border-foodz-200 p-6 rounded-lg bg-foodz-50 mb-6 flex flex-col items-center">
             {qrCodeUrl && (
-              <img 
-                src={qrCodeUrl} 
-                alt={`QR code for ${restaurantName}`} 
-                className="w-64 h-64"
-              />
+              <>
+                <div className="bg-white p-3 rounded-lg shadow-sm mb-3">
+                  <img 
+                    src={qrCodeUrl} 
+                    alt={`QR code for ${restaurantName}`} 
+                    className="w-56 h-56"
+                  />
+                </div>
+                <div className="text-center">
+                  <h3 className="font-medium text-foodz-800">Scan to view menu</h3>
+                  <p className="text-xs text-foodz-600 mt-1">powered by foodz</p>
+                </div>
+              </>
             )}
           </div>
           
-          <div className="w-full mb-4">
+          <div className="w-full mb-6">
             <div className="flex items-center mb-2">
               <div className="flex-grow font-medium text-sm">Restaurant Link:</div>
               <button 
@@ -95,20 +128,21 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
             </div>
           </div>
           
-          <div className="flex space-x-3 w-full">
+          <div className="grid grid-cols-2 gap-3 w-full">
             <Button 
               variant="outline" 
-              className="flex-1"
-              onClick={onClose}
-            >
-              Close
-            </Button>
-            <Button 
-              className="flex-1"
               onClick={downloadQRCode}
+              className="w-full"
               icon={<Download className="h-4 w-4 mr-2" />}
             >
               Download
+            </Button>
+            <Button 
+              onClick={shareQRCode}
+              className="w-full"
+              icon={<Share2 className="h-4 w-4 mr-2" />}
+            >
+              Share
             </Button>
           </div>
         </div>

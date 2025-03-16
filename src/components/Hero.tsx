@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui-custom/Button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, QrCode, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Hero = () => {
@@ -17,7 +17,7 @@ const Hero = () => {
   }, []);
 
   return (
-    <section className="relative pt-28 pb-20 overflow-hidden">
+    <section className="relative pt-20 pb-20 overflow-hidden">
       {/* Background elements */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-foodz-100 rounded-full filter blur-3xl opacity-60"></div>
@@ -25,32 +25,34 @@ const Hero = () => {
       </div>
       
       <div className="container mx-auto px-4 md:px-6 relative z-10">
-        <div className="max-w-4xl mx-auto text-center">
-          <div 
-            className={`transition-all duration-700 ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-            }`}
-          >
-            <span className="inline-block mb-4 px-3 py-1 text-xs font-medium text-foodz-700 bg-foodz-100 rounded-full">
-              Simple. Powerful. Delicious.
-            </span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className={`transition-all duration-700 ${isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}>
+            {/* Logo and branding */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <QrCode className="h-10 w-10 text-foodz-500" />
+                <h2 className="text-3xl font-bold text-foodz-500">foodz</h2>
+              </div>
+              <span className="inline-block mb-4 px-3 py-1 text-xs font-medium text-foodz-700 bg-foodz-100 rounded-full">
+                Digital Menu Solutions
+              </span>
+            </div>
             
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-              Elevate Your Restaurant's Digital Presence
+            <h1 className="text-4xl md:text-5xl lg:text-5xl font-bold tracking-tight mb-6">
+              Transform Your <span className="text-foodz-500">Restaurant Experience</span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              Create beautiful menus, manage orders, and grow your business with Foodz - the all-in-one platform designed for modern restaurants.
+            <p className="text-lg md:text-xl text-muted-foreground mb-8">
+              Create digital menus, manage orders, and grow your business with Foodz - the all-in-one platform for modern restaurants.
             </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <Button 
                 size="lg" 
                 className="group" 
                 asChild
               >
-                <Link to="/signup" className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium bg-base text-foodz-600 hover:bg-opacity-60 transition-all transform hover:-translate-y-1 shadow-lg"
->
+                <Link to="/signup">
                   Get Started 
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
@@ -60,42 +62,35 @@ const Hero = () => {
                 size="lg" 
                 asChild
               >
-                <Link to="/demo" className="inline-flex items-center justify-center rounded-full px-6 py-3 text-black font-medium bg-white text-foodz-600 hover:bg-opacity-90 transition-all transform hover:-translate-y-1 shadow-lg"
->
+                <Link to="/demo">
                   View Demo
                 </Link>
               </Button>
             </div>
           </div>
 
-          {/* Hero Image */}
-          <div 
-            className={`mt-12 relative transition-all duration-1000 delay-300 ${
-              isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-            }`}
-          >
-            <div className="glass-card rounded-2xl overflow-hidden shadow-xl border border-white/30">
-              <img 
-                src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2567&q=80" 
-                alt="Restaurant dashboard showcase" 
-                className={`w-full transition-all duration-700 ${isLoaded ? "img-loaded" : "img-loading"}`}
-                loading="lazy"
-              />
-            </div>
-            
-            {/* Floating elements */}
-            <div className="absolute -top-6 -right-6 lg:right-0 p-4 glass-card rounded-xl shadow-lg transform rotate-3 hidden md:block animate-smooth-appear">
-              <div className="flex items-center space-x-2">
-                <div className="h-6 w-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>
-                <p className="text-sm font-medium">Order received</p>
+          {/* QR Code Tent Card Mockup */}
+          <div className={`transition-all duration-1000 delay-300 ${isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}>
+            <div className="relative mx-auto max-w-md perspective-800">
+              <div className="bg-white rounded-lg shadow-xl p-6 transform rotate-y-5 rotate-x-5">
+                <div className="bg-foodz-50 p-4 rounded-lg text-center">
+                  <div className="flex justify-center mb-4">
+                    <QrCode className="h-8 w-8 text-foodz-500" />
+                  </div>
+                  <h3 className="font-bold text-xl mb-2">Scan to see our menu</h3>
+                  <div className="bg-white p-4 rounded-md inline-block">
+                    <img 
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://foodz.app/restaurant/123" 
+                      alt="Restaurant QR Code" 
+                      className="w-32 h-32 mx-auto"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-foodz-700">Powered by Foodz</p>
+                </div>
               </div>
-            </div>
-            
-            <div className="absolute -bottom-4 -left-4 lg:left-0 p-4 glass-card rounded-xl shadow-lg transform -rotate-2 hidden md:block animate-smooth-appear delay-150">
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 bg-foodz-500 rounded-full flex items-center justify-center text-white text-xs">+26%</div>
-                <p className="text-sm font-medium">More orders</p>
-              </div>
+              
+              {/* Shadow effect */}
+              <div className="absolute -bottom-4 inset-x-0 h-10 bg-black/10 blur-md rounded-full z-0"></div>
             </div>
           </div>
         </div>
