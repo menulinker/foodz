@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui-custom/Button";
-import { ArrowRight, QrCode } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Hero = () => {
@@ -43,10 +43,10 @@ const Hero = () => {
             <div className="flex flex-col sm:flex-row gap-4">
               <Button 
                 size="lg" 
-                className="group bg-[#F9432B] hover:bg-[#e33a23] rounded-full transition-all duration-300" 
+                className="group" 
                 asChild
               >
-                <Link to="/auth" className="flex items-center">
+                <Link to="/auth" className="inline-flex items-center justify-center rounded-full px-6 py-3 text-base font-medium bg-[#F9432B] text-white hover:bg-opacity-90 transition-all transform hover:-translate-y-1 shadow-lg">
                   Get Started 
                   <span className="ml-2 bg-white/20 rounded-full p-1 transition-transform group-hover:translate-x-1">
                     <ArrowRight className="h-4 w-4" />
@@ -56,24 +56,15 @@ const Hero = () => {
             </div>
           </div>
 
-          {/* QR Code Tent Card Mockup */}
+          {/* Chef Image */}
           <div className={`transition-all duration-1000 delay-300 ${isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}>
             <div className="relative mx-auto max-w-md perspective-800">
               <div className="bg-white rounded-lg shadow-xl p-6 transform rotate-y-5 rotate-x-5">
-                <div className="bg-red-50 p-4 rounded-lg text-center">
-                  <div className="flex justify-center mb-4">
-                    <QrCode className="h-8 w-8 text-[#F9432B]" />
-                  </div>
-                  <h3 className="font-bold text-xl mb-2">Scan for menu</h3>
-                  <div className="bg-white p-4 rounded-md inline-block">
-                    <img 
-                      src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://foodz.app/restaurant/123" 
-                      alt="Restaurant QR Code" 
-                      className="w-32 h-32 mx-auto"
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-[#F9432B]">Powered by Foodz</p>
-                </div>
+                <img 
+                  src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
+                  alt="Chef using digital menu" 
+                  className="w-full h-auto rounded-lg"
+                />
               </div>
               
               {/* Shadow effect */}
