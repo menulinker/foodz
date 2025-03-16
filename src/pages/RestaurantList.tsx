@@ -16,6 +16,7 @@ interface Restaurant {
   description: string;
   cuisine: string;
   address: string;
+  imageUrl?: string;
   rating?: number;
   openingHours?: {
     [day: string]: string;
@@ -55,6 +56,7 @@ const RestaurantList = () => {
               description: data.description || "",
               cuisine: data.cuisine || "",
               address: data.address || "",
+              imageUrl: data.imageUrl || "",
               rating: data.rating || 4.5,
               openingHours: data.openingHours || {}
             };
@@ -209,10 +211,17 @@ const RestaurantList = () => {
                   onClick={() => navigate(`/restaurant/${restaurant.id}`)}
                 >
                   <div className="h-48 bg-gray-200 relative">
-                    {/* Restaurant image would go here */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Utensils className="h-12 w-12 text-gray-400" />
-                    </div>
+                    {restaurant.imageUrl ? (
+                      <img 
+                        src={restaurant.imageUrl} 
+                        alt={restaurant.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Utensils className="h-12 w-12 text-gray-400" />
+                      </div>
+                    )}
                   </div>
                   
                   <div className="p-5">

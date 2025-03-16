@@ -1,7 +1,7 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, X } from "lucide-react";
+import { ArrowLeft, Save, X, Upload, Trash2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
@@ -9,6 +9,7 @@ import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 interface RestaurantProfile {
   name: string;
@@ -18,6 +19,7 @@ interface RestaurantProfile {
   email: string;
   website: string;
   cuisine: string;
+  imageUrl: string;
   openingHours: {
     monday: string;
     tuesday: string;
@@ -34,6 +36,8 @@ const RestaurantSettings = () => {
   const { user, isLoading: authLoading } = useFirebaseAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Restaurant profile state
   const [restaurantProfile, setRestaurantProfile] = useState<RestaurantProfile>({
@@ -44,6 +48,7 @@ const RestaurantSettings = () => {
     email: "",
     website: "",
     cuisine: "",
+    imageUrl: "",
     openingHours: {
       monday: "9:00 AM - 9:00 PM",
       tuesday: "9:00 AM - 9:00 PM",
@@ -96,7 +101,9 @@ const RestaurantSettings = () => {
               friday: "9:00 AM - 9:00 PM",
               saturday: "9:00 AM - 9:00 PM",
               sunday: "Closed"
-            }
+            },
+            // Ensure imageUrl exists
+            imageUrl: data.imageUrl || ""
           });
         } else {
           // Create initial restaurant profile if it doesn't exist
@@ -108,6 +115,7 @@ const RestaurantSettings = () => {
             email: user.email || "",
             website: "",
             cuisine: "",
+            imageUrl: "",
             openingHours: {
               monday: "9:00 AM - 9:00 PM",
               tuesday: "9:00 AM - 9:00 PM",
@@ -156,6 +164,66 @@ const RestaurantSettings = () => {
         [day]: value
       }
     }));
+  };
+  
+  // Handle image upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !user?.uid) return;
+    
+    setIsUploading(true);
+    
+    try {
+      const file = e.target.files[0];
+      const storage = getStorage();
+      const storageRef = ref(storage, `restaurants/${user.uid}/profile`);
+      
+      // Upload the file
+      await uploadBytes(storageRef, file);
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // Update state with the new image URL
+      setRestaurantProfile((prev) => ({
+        ...prev,
+        imageUrl: downloadURL
+      }));
+      
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
+  // Handle image removal
+  const handleRemoveImage = async () => {
+    if (!user?.uid || !restaurantProfile.imageUrl) return;
+    
+    setIsUploading(true);
+    
+    try {
+      const storage = getStorage();
+      const storageRef = ref(storage, `restaurants/${user.uid}/profile`);
+      
+      // Delete the file from storage
+      await deleteObject(storageRef);
+      
+      // Update state
+      setRestaurantProfile((prev) => ({
+        ...prev,
+        imageUrl: ""
+      }));
+      
+      toast.success("Image removed successfully");
+    } catch (error) {
+      console.error("Error removing image:", error);
+      toast.error("Failed to remove image");
+    } finally {
+      setIsUploading(false);
+    }
   };
   
   // Save restaurant profile
@@ -232,6 +300,70 @@ const RestaurantSettings = () => {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">Restaurant Profile</h2>
+            </div>
+            
+            <div className="p-6 border-b">
+              <h3 className="text-lg font-medium mb-4">Profile Image</h3>
+              <div className="flex items-start space-x-6">
+                <div className="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden relative">
+                  {restaurantProfile.imageUrl ? (
+                    <img 
+                      src={restaurantProfile.imageUrl} 
+                      alt={restaurantProfile.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Upload a clear image of your restaurant or logo. <br />
+                    Recommended size: 500x500 pixels.
+                  </p>
+                  
+                  <div className="flex space-x-3">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-foodz-500 mr-2"></div>
+                      ) : (
+                        <Upload className="mr-2 h-4 w-4" />
+                      )}
+                      Upload Image
+                    </Button>
+                    
+                    {restaurantProfile.imageUrl && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        disabled={isUploading}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove
+                      </Button>
+                    )}
+                    
+                    <input 
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/png, image/jpeg, image/jpg"
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
             
             <div className="p-6">

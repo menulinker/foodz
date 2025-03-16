@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -23,6 +22,7 @@ interface Restaurant {
   address: string;
   phone: string;
   website: string;
+  imageUrl: string;
   rating?: number;
   openingHours?: {
     [day: string]: string;
@@ -42,16 +42,13 @@ const RestaurantDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [todayHours, setTodayHours] = useState<string>("Closed");
   
-  // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerNotes, setCustomerNotes] = useState("");
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   
-  // Category filter
   const [activeCategory, setActiveCategory] = useState<string>("All");
   
-  // Fetch restaurant data
   useEffect(() => {
     if (!restaurantId) return;
     
@@ -64,10 +61,10 @@ const RestaurantDetail = () => {
           const data = docSnapshot.data() as Omit<Restaurant, 'id'>;
           setRestaurant({
             id: docSnapshot.id,
-            ...data
+            ...data,
+            imageUrl: data.imageUrl || ""
           });
           
-          // Set today's hours
           const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
           const today = days[new Date().getDay()];
           setTodayHours(data.openingHours?.[today] || "Closed");
@@ -86,14 +83,12 @@ const RestaurantDetail = () => {
     fetchRestaurantData();
   }, [restaurantId, navigate]);
   
-  // Make sure user is authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
   
-  // Fetch categories
   const {
     data: categories,
     isLoading: categoriesLoading
@@ -102,7 +97,6 @@ const RestaurantDetail = () => {
     parentDoc: restaurantId ? { collection: "restaurants", id: restaurantId } : undefined
   });
   
-  // Fetch menu items
   const {
     data: menuItems,
     isLoading: menuItemsLoading
@@ -111,18 +105,15 @@ const RestaurantDetail = () => {
     parentDoc: restaurantId ? { collection: "restaurants", id: restaurantId } : undefined
   });
   
-  // Add item to cart
   const addToCart = (item: MenuItemType) => {
     setCart(prevCart => {
       const existingItemIndex = prevCart.findIndex(cartItem => cartItem.id === item.id);
       
       if (existingItemIndex >= 0) {
-        // Item already in cart, increment quantity
         const updatedCart = [...prevCart];
         updatedCart[existingItemIndex].quantity += 1;
         return updatedCart;
       } else {
-        // Add new item to cart
         return [...prevCart, { ...item, quantity: 1 }];
       }
     });
@@ -130,7 +121,6 @@ const RestaurantDetail = () => {
     toast.success(`Added ${item.name} to cart`);
   };
   
-  // Update item quantity in cart
   const updateCartItemQuantity = (itemId: string, change: number) => {
     setCart(prevCart => {
       return prevCart.map(item => {
@@ -143,17 +133,14 @@ const RestaurantDetail = () => {
     });
   };
   
-  // Remove item from cart
   const removeFromCart = (itemId: string) => {
     setCart(prevCart => prevCart.filter(item => item.id !== itemId));
   };
   
-  // Calculate cart total
   const calculateCartTotal = () => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
   
-  // Submit order
   const handleSubmitOrder = async () => {
     if (!user || !restaurantId) return;
     
@@ -165,7 +152,6 @@ const RestaurantDetail = () => {
     setIsSubmittingOrder(true);
     
     try {
-      // Create order in restaurant's orders collection
       const orderData = {
         customer: {
           id: user.uid,
@@ -182,11 +168,9 @@ const RestaurantDetail = () => {
         notes: customerNotes || undefined
       };
       
-      // Add to restaurant's orders collection
       const restaurantOrdersRef = collection(db, "restaurants", restaurantId, "orders");
       const restaurantOrderDoc = await addDoc(restaurantOrdersRef, orderData);
       
-      // Also add to client's orders collection
       const clientOrdersRef = collection(db, "users", user.uid, "orders");
       await addDoc(clientOrdersRef, {
         ...orderData,
@@ -197,7 +181,6 @@ const RestaurantDetail = () => {
         }
       });
       
-      // Clear cart
       setCart([]);
       setCustomerNotes("");
       setIsCartOpen(false);
@@ -213,7 +196,6 @@ const RestaurantDetail = () => {
     }
   };
   
-  // Loading state
   if (isLoading || categoriesLoading || menuItemsLoading) {
     return (
       <div className="flex flex-col min-h-screen">
@@ -262,7 +244,6 @@ const RestaurantDetail = () => {
             </Link>
           </div>
           
-          {/* Restaurant Header */}
           <RestaurantHeader 
             restaurant={restaurant}
             cartItemsCount={cart.length}
@@ -270,7 +251,6 @@ const RestaurantDetail = () => {
             onOpenCart={() => setIsCartOpen(true)}
           />
           
-          {/* Menu */}
           <div className="flex flex-col lg:flex-row gap-8">
             <div className="lg:w-1/4 order-1 lg:order-none">
               <MenuCategories 
@@ -291,7 +271,6 @@ const RestaurantDetail = () => {
         </div>
       </main>
       
-      {/* Cart Sidebar */}
       <CartSidebar 
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}

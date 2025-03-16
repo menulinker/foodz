@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui-custom/Button";
 import { QrCode, Copy, Download, X, Share2 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -27,23 +27,27 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
   
   const copyLinkToClipboard = () => {
     navigator.clipboard.writeText(shareUrl);
-    toast({
-      title: "Success",
-      description: "Link copied to clipboard"
-    });
+    toast.success("Link copied to clipboard");
   };
   
   const downloadQRCode = () => {
-    const link = document.createElement("a");
-    link.href = qrCodeUrl;
-    link.download = `${restaurantName.replace(/\s+/g, "-")}-qrcode.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast({
-      title: "Success",
-      description: "QR code downloaded"
-    });
+    // Create a temporary link and download the image
+    fetch(qrCodeUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${restaurantName.replace(/\s+/g, "-")}-qrcode.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success("QR code downloaded");
+      })
+      .catch(() => {
+        toast.error("Failed to download QR code");
+      });
   };
 
   // Function to share QR code
@@ -55,23 +59,15 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
           text: `Check out the menu for ${restaurantName}`,
           url: shareUrl,
         });
-        toast({
-          title: "Success",
-          description: "Link shared successfully"
-        });
+        toast.success("Link shared successfully");
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to share",
-          variant: "destructive"
-        });
+        console.error("Error sharing:", error);
+        copyLinkToClipboard();
       }
     } else {
       copyLinkToClipboard();
     }
   };
-  
-  if (!isOpen) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -102,6 +98,10 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
                     src={qrCodeUrl} 
                     alt={`QR code for ${restaurantName}`} 
                     className="w-56 h-56"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).onerror = null;
+                      (e.target as HTMLImageElement).src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjVmNWY1Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzg4OCIqPlFSIENvZGUgTm90IEF2YWlsYWJsZTwvdGV4dD48L3N2Zz4=";
+                    }}
                   />
                 </div>
                 <div className="text-center">
@@ -133,15 +133,15 @@ const QRCodeModal = ({ isOpen, onClose, restaurantId, restaurantName }: QRCodeMo
               variant="outline" 
               onClick={downloadQRCode}
               className="w-full"
-              icon={<Download className="h-4 w-4 mr-2" />}
             >
+              <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
             <Button 
               onClick={shareQRCode}
               className="w-full"
-              icon={<Share2 className="h-4 w-4 mr-2" />}
             >
+              <Share2 className="h-4 w-4 mr-2" />
               Share
             </Button>
           </div>
