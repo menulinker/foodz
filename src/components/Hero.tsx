@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui-custom/Button";
-import { ArrowRight, QrCode, ChevronRight } from "lucide-react";
+import { ArrowRight, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Hero = () => {
@@ -52,18 +52,9 @@ const Hero = () => {
                 className="group" 
                 asChild
               >
-                <Link to="/signup">
+                <Link to="/auth">
                   Get Started 
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                asChild
-              >
-                <Link to="/demo">
-                  View Demo
                 </Link>
               </Button>
             </div>

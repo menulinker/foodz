@@ -1,23 +1,17 @@
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui-custom/Button";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
-import ProfileButton from "./ProfileButton";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, logout } = useFirebaseAuth();
+  const { user } = useFirebaseAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { toast } = useToast();
   
-  // Determine if we're on the main landing page or not
-  const isLandingPage = location.pathname === "/";
-
   // Update scroll state for navbar appearance
   useEffect(() => {
     const handleScroll = () => {
@@ -27,29 +21,6 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate("/");
-    } catch (error) {
-      console.error("Error logging out:", error);
-      toast({
-        title: "Logout error",
-        description: "There was a problem logging out. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getDashboardLink = () => {
-    if (user?.role === "restaurant") {
-      return "/restaurant/dashboard";
-    } else if (user?.role === "client") {
-      return "/client/profile";
-    }
-    return "/";
-  };
 
   return (
     <header 
@@ -75,55 +46,72 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link 
-              to="/" 
-              className="text-sm font-medium text-foreground hover:text-foodz-500 transition-colors"
-            >
-              Home
-            </Link>
-            <Link 
-              to="/features" 
-              className="text-sm font-medium text-foreground hover:text-foodz-500 transition-colors"
-            >
-              Features
-            </Link>
-          </nav>
-
-          {/* Auth Buttons Desktop */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Auth Button Desktop */}
+          <div className="hidden md:flex items-center">
             {user ? (
-              <ProfileButton />
+              <Button 
+                variant="primary" 
+                size="sm" 
+                asChild
+              >
+                <Link to={user.role === "restaurant" ? "/restaurant/dashboard" : "/client/profile"}>
+                  Dashboard
+                </Link>
+              </Button>
             ) : (
               <Button 
                 variant="primary" 
                 size="sm" 
                 asChild
               >
-                <Link to="/auth" className="inline-flex items-center justify-center rounded-full px-6 py-3 text-white font-medium bg-foodz-500 text-foodz-600 hover:bg-opacity-90 transition-all transform hover:-translate-y-1 shadow-lg"
-                >
-                  Sign in </Link>
+                <Link to="/auth">
+                  Sign in
+                </Link>
               </Button>
             )}
           </div>
 
           {/* Mobile Menu Button */}
-          <button 
-            className="md:hidden text-foreground p-2 rounded-md"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
+          <div className="md:hidden flex items-center">
+            {user ? (
+              <Button 
+                variant="primary" 
+                size="sm" 
+                asChild
+                className="mr-2"
+              >
+                <Link to={user.role === "restaurant" ? "/restaurant/dashboard" : "/client/profile"}>
+                  Dashboard
+                </Link>
+              </Button>
             ) : (
-              <Menu className="h-6 w-6" />
+              <Button 
+                variant="primary" 
+                size="sm" 
+                asChild
+                className="mr-2"
+              >
+                <Link to="/auth">
+                  Sign in
+                </Link>
+              </Button>
             )}
-          </button>
+            <button 
+              className="text-foreground p-2 rounded-md"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Simplified */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white absolute top-full left-0 right-0 shadow-lg animate-smooth-appear">
           <div className="container mx-auto px-4 py-4 flex flex-col space-y-4">
@@ -134,52 +122,6 @@ const Navbar = () => {
             >
               Home
             </Link>
-            <Link 
-              to="/features" 
-              className="text-base font-medium py-2 text-foreground hover:text-foodz-500 transition-colors"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Features
-            </Link>
-            <div className="pt-2 flex flex-col space-y-3">
-              {user ? (
-                <>
-                  <Button 
-                    variant="outline" 
-                    size="md" 
-                    className="w-full justify-center" 
-                    asChild
-                  >
-                    <Link to={getDashboardLink()} onClick={() => setIsMobileMenuOpen(false)}>
-                      Dashboard
-                    </Link>
-                  </Button>
-                  <Button 
-                    variant="primary" 
-                    size="md" 
-                    className="w-full justify-center"
-                    onClick={() => {
-                      handleLogout();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    icon={<LogOut className="h-4 w-4" />}
-                  >
-                    Log out
-                  </Button>
-                </>
-              ) : (
-                <Button 
-                  variant="primary" 
-                  size="md" 
-                  className="w-full justify-center" 
-                  asChild
-                >
-                  <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
-                    Log in / Sign up
-                  </Link>
-                </Button>
-              )}
-            </div>
           </div>
         </div>
       )}
