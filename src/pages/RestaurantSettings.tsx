@@ -1,7 +1,7 @@
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, X, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui-custom/Button";
@@ -9,7 +9,9 @@ import { useFirebaseAuth } from "@/context/FirebaseAuthContext";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import ProfileImageUploader from "@/components/restaurant/ProfileImageUploader";
+import ProfileForm from "@/components/restaurant/ProfileForm";
+import BusinessHours from "@/components/restaurant/BusinessHours";
 
 interface RestaurantProfile {
   name: string;
@@ -36,8 +38,6 @@ const RestaurantSettings = () => {
   const { user, isLoading: authLoading } = useFirebaseAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Restaurant profile state
   const [restaurantProfile, setRestaurantProfile] = useState<RestaurantProfile>({
@@ -72,7 +72,7 @@ const RestaurantSettings = () => {
       return;
     }
     
-    document.title = "Restaurant Settings | Tapla";
+    document.title = "Restaurant Settings | Foodz";
   }, [user, authLoading, navigate]);
   
   // Load restaurant profile from Firestore
@@ -156,7 +156,7 @@ const RestaurantSettings = () => {
   };
   
   // Handle opening hours change
-  const handleHoursChange = (day: keyof RestaurantProfile['openingHours'], value: string) => {
+  const handleHoursChange = (day: string, value: string) => {
     setRestaurantProfile((prev) => ({
       ...prev,
       openingHours: {
@@ -166,64 +166,12 @@ const RestaurantSettings = () => {
     }));
   };
   
-  // Handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !user?.uid) return;
-    
-    setIsUploading(true);
-    
-    try {
-      const file = e.target.files[0];
-      const storage = getStorage();
-      const storageRef = ref(storage, `restaurants/${user.uid}/profile`);
-      
-      // Upload the file
-      await uploadBytes(storageRef, file);
-      
-      // Get the download URL
-      const downloadURL = await getDownloadURL(storageRef);
-      
-      // Update state with the new image URL
-      setRestaurantProfile((prev) => ({
-        ...prev,
-        imageUrl: downloadURL
-      }));
-      
-      toast.success("Image uploaded successfully");
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      toast.error("Failed to upload image");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-  
-  // Handle image removal
-  const handleRemoveImage = async () => {
-    if (!user?.uid || !restaurantProfile.imageUrl) return;
-    
-    setIsUploading(true);
-    
-    try {
-      const storage = getStorage();
-      const storageRef = ref(storage, `restaurants/${user.uid}/profile`);
-      
-      // Delete the file from storage
-      await deleteObject(storageRef);
-      
-      // Update state
-      setRestaurantProfile((prev) => ({
-        ...prev,
-        imageUrl: ""
-      }));
-      
-      toast.success("Image removed successfully");
-    } catch (error) {
-      console.error("Error removing image:", error);
-      toast.error("Failed to remove image");
-    } finally {
-      setIsUploading(false);
-    }
+  // Handle profile image update
+  const handleImageUpdate = (url: string) => {
+    setRestaurantProfile((prev) => ({
+      ...prev,
+      imageUrl: url
+    }));
   };
   
   // Save restaurant profile
@@ -304,198 +252,28 @@ const RestaurantSettings = () => {
             
             <div className="p-6 border-b">
               <h3 className="text-lg font-medium mb-4">Profile Image</h3>
-              <div className="flex items-start space-x-6">
-                <div className="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden relative">
-                  {restaurantProfile.imageUrl ? (
-                    <img 
-                      src={restaurantProfile.imageUrl} 
-                      alt={restaurantProfile.name} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Upload a clear image of your restaurant or logo. <br />
-                    Recommended size: 500x500 pixels.
-                  </p>
-                  
-                  <div className="flex space-x-3">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-foodz-500 mr-2"></div>
-                      ) : (
-                        <Upload className="mr-2 h-4 w-4" />
-                      )}
-                      Upload Image
-                    </Button>
-                    
-                    {restaurantProfile.imageUrl && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={handleRemoveImage}
-                        disabled={isUploading}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove
-                      </Button>
-                    )}
-                    
-                    <input 
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/png, image/jpeg, image/jpg"
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-              </div>
+              <ProfileImageUploader 
+                userId={user!.uid} 
+                imageUrl={restaurantProfile.imageUrl}
+                onImageUpdate={handleImageUpdate}
+              />
             </div>
             
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium mb-2">
-                    Restaurant Name*
-                  </label>
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    value={restaurantProfile.name}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="cuisine" className="block text-sm font-medium mb-2">
-                    Cuisine Type
-                  </label>
-                  <input
-                    id="cuisine"
-                    name="cuisine"
-                    type="text"
-                    value={restaurantProfile.cuisine}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    placeholder="e.g. Italian, Mexican, Chinese"
-                  />
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label htmlFor="description" className="block text-sm font-medium mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={restaurantProfile.description}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    rows={4}
-                    placeholder="Describe your restaurant..."
-                  />
-                </div>
-              </div>
-            </div>
+            <ProfileForm 
+              name={restaurantProfile.name}
+              cuisine={restaurantProfile.cuisine}
+              description={restaurantProfile.description}
+              address={restaurantProfile.address}
+              phone={restaurantProfile.phone}
+              email={restaurantProfile.email}
+              website={restaurantProfile.website}
+              onInputChange={handleInputChange}
+            />
             
-            <div className="p-6 border-t">
-              <h2 className="text-xl font-semibold mb-6">Contact Information</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="address" className="block text-sm font-medium mb-2">
-                    Address
-                  </label>
-                  <input
-                    id="address"
-                    name="address"
-                    type="text"
-                    value={restaurantProfile.address}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={restaurantProfile.phone}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={restaurantProfile.email}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="website" className="block text-sm font-medium mb-2">
-                    Website (Optional)
-                  </label>
-                  <input
-                    id="website"
-                    name="website"
-                    type="url"
-                    value={restaurantProfile.website}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                    placeholder="https://example.com"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-6 border-t">
-              <h2 className="text-xl font-semibold mb-6">Business Hours</h2>
-              
-              <div className="space-y-4">
-                {Object.entries(restaurantProfile.openingHours).map(([day, hours]) => (
-                  <div key={day} className="flex items-center">
-                    <span className="w-28 font-medium capitalize">{day}</span>
-                    <input
-                      type="text"
-                      value={hours}
-                      onChange={(e) => handleHoursChange(day as keyof RestaurantProfile['openingHours'], e.target.value)}
-                      className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
-                      placeholder="e.g. 9:00 AM - 5:00 PM or Closed"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <BusinessHours 
+              openingHours={restaurantProfile.openingHours}
+              onHoursChange={handleHoursChange}
+            />
             
             <div className="p-6 border-t flex justify-end">
               <Button onClick={handleSaveProfile} disabled={isSaving}>
