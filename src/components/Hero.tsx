@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui-custom/Button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShoppingBag } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Hero = () => {
@@ -78,15 +78,13 @@ const Hero = () => {
                   />
                 </div>
                 
-                <div className="absolute -top-8 -right-8 w-24 h-24 bg-white rounded-lg shadow-lg p-2 transform -rotate-12 animate-bounce">
-                  <div className="w-full h-full bg-[#F9432B] rounded flex items-center justify-center">
-                    <svg className="w-12 h-12 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3 6H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M19 6V20C19 21.1046 18.1046 22 17 22H7C5.89543 22 5 21.1046 5 20V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M8 6V4C8 2.89543 8.89543 2 10 2H14C15.1046 2 16 2.89543 16 4V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M10 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                {/* "More Orders" sticker - replacing the trash icon */}
+                <div className="absolute -top-8 -right-8 w-24 h-24 bg-white rounded-full shadow-lg transform -rotate-12 animate-bounce">
+                  <div className="w-full h-full bg-gradient-to-br from-[#F9432B] to-foodz-600 rounded-full flex items-center justify-center p-2 text-center">
+                    <div>
+                      <ShoppingBag className="w-8 h-8 text-white mx-auto mb-1" />
+                      <p className="text-xs font-bold text-white leading-tight">MORE ORDERS</p>
+                    </div>
                   </div>
                 </div>
                 

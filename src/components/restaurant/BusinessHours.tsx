@@ -1,5 +1,6 @@
 
 import React from "react";
+import { Clock } from "lucide-react";
 
 interface BusinessHoursProps {
   openingHours: {
@@ -11,7 +12,10 @@ interface BusinessHoursProps {
 const BusinessHours = ({ openingHours, onHoursChange }: BusinessHoursProps) => {
   return (
     <div className="p-6 border-t">
-      <h2 className="text-xl font-semibold mb-6">Business Hours</h2>
+      <div className="flex items-center mb-6">
+        <Clock className="h-5 w-5 mr-2 text-foodz-500" />
+        <h2 className="text-xl font-semibold">Business Hours</h2>
+      </div>
       
       <div className="space-y-4">
         {Object.entries(openingHours).map(([day, hours]) => (
