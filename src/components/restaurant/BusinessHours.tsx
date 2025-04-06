@@ -19,13 +19,13 @@ const BusinessHours = ({ openingHours, onHoursChange }: BusinessHoursProps) => {
       
       <div className="space-y-4">
         {Object.entries(openingHours).map(([day, hours]) => (
-          <div key={day} className="flex items-center">
+          <div key={day} className="flex items-center group hover:bg-gray-50 p-2 rounded-lg transition-colors">
             <span className="w-28 font-medium capitalize">{day}</span>
             <input
               type="text"
               value={hours}
               onChange={(e) => onHoursChange(day, e.target.value)}
-              className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500"
+              className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-foodz-500 transition-all"
               placeholder="e.g. 9:00 AM - 5:00 PM or Closed"
             />
           </div>
